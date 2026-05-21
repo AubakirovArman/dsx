@@ -9,6 +9,7 @@ pub async fn run_plan(
     task: &str,
     mode: dsx_core::types::PermissionMode,
 ) -> anyhow::Result<()> {
+    let scope = prepare_cli_agent_scope(&project_root, task)?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,
@@ -18,6 +19,7 @@ pub async fn run_plan(
         approval_tx: None,
     };
     println!("Planning agent executing...");
+    print_cli_scope(&scope);
     let outcome = dsx_agent::run(task, &config).await?;
     println!();
     println!(
@@ -37,6 +39,7 @@ pub async fn run_edit(
     task: &str,
     mode: dsx_core::types::PermissionMode,
 ) -> anyhow::Result<()> {
+    let scope = prepare_cli_agent_scope(&project_root, task)?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,
@@ -46,6 +49,7 @@ pub async fn run_edit(
         approval_tx: None,
     };
     println!("Running agent...");
+    print_cli_scope(&scope);
     let outcome = dsx_agent::run(task, &config).await?;
     println!();
     println!(
@@ -177,6 +181,25 @@ pub fn run_scope_preview(project_root: &Path, task: &str) {
             "no"
         }
     );
+}
+
+pub(crate) fn prepare_cli_agent_scope(
+    project_root: &Path,
+    task: &str,
+) -> anyhow::Result<crate::task_scope::ResolvedTaskScope> {
+    let scope = crate::task_scope::resolve_task_scope(project_root, task);
+    if let Some(message) =
+        crate::scope_guard::wide_scope_blocker(project_root, task, scope.narrowed)
+    {
+        anyhow::bail!("{message}");
+    }
+    Ok(scope)
+}
+
+fn print_cli_scope(scope: &crate::task_scope::ResolvedTaskScope) {
+    if scope.narrowed {
+        println!("Scope: {}", scope.active_label);
+    }
 }
 
 pub async fn run_mcp_list(command: &str, args: &[String]) -> anyhow::Result<()> {

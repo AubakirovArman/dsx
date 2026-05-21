@@ -7,7 +7,10 @@ mod context_preview_tests;
 pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
+#[cfg(test)]
+mod handlers_tests;
 pub mod run_ledger;
+pub mod scope_guard;
 pub mod session_state;
 #[cfg(test)]
 mod session_state_tests;
