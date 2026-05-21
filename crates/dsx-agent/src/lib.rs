@@ -94,7 +94,7 @@ async fn run_streaming_internal(
         },
         Message {
             role: "system".into(),
-            content: Some(task_brief),
+            content: Some(task_brief.clone()),
             tool_calls: None,
             tool_call_id: None,
             reasoning_content: None,
@@ -264,7 +264,11 @@ async fn run_streaming_internal(
             break;
         }
         messages.extend(tool_msgs);
-        if let Some(stats) = transcript::compact_messages(&mut messages, &all_tool_results) {
+        if let Some(stats) = transcript::compact_messages_with_task_state(
+            &mut messages,
+            &all_tool_results,
+            &task_brief,
+        ) {
             let _ = tx.send(StreamEvent::TranscriptCompact {
                 removed_messages: stats.removed_messages,
                 retained_messages: stats.retained_messages,

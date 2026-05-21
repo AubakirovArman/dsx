@@ -7,6 +7,7 @@ use dsx_provider::types::Message;
 const SUMMARY_PREFIX: &str = "Rolling transcript summary:";
 const COMPACT_AFTER_MESSAGES: usize = 18;
 const RECENT_MESSAGE_WINDOW: usize = 8;
+const TASK_STATE_CAPSULE_CHARS: usize = 2_400;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompactionStats {
@@ -18,6 +19,14 @@ pub struct CompactionStats {
 pub fn compact_messages(
     messages: &mut Vec<Message>,
     tool_results: &[ToolResult],
+) -> Option<CompactionStats> {
+    compact_messages_with_task_state(messages, tool_results, "")
+}
+
+pub fn compact_messages_with_task_state(
+    messages: &mut Vec<Message>,
+    tool_results: &[ToolResult],
+    task_state: &str,
 ) -> Option<CompactionStats> {
     if messages.len() <= COMPACT_AFTER_MESSAGES {
         return None;
@@ -35,7 +44,7 @@ pub fn compact_messages(
         .map(message_chars)
         .sum::<usize>();
     let mut compacted = base_prefix(messages, user_index);
-    compacted.push(summary_message(removed_count, tool_results));
+    compacted.push(summary_message(removed_count, tool_results, task_state));
     compacted.push(messages[user_index].clone());
     compacted.extend_from_slice(&messages[tail_start..]);
     *messages = compacted;
@@ -65,17 +74,40 @@ fn safe_tail_start(messages: &[Message], prefix_len: usize) -> usize {
     start
 }
 
-fn summary_message(removed_count: usize, tool_results: &[ToolResult]) -> Message {
+fn summary_message(removed_count: usize, tool_results: &[ToolResult], task_state: &str) -> Message {
+    let capsule = task_state_capsule(task_state);
+    let task_line = if capsule.is_empty() {
+        "- Task state capsule: unavailable; continue from retained recent messages.".into()
+    } else {
+        format!("- Task state capsule:\n{capsule}")
+    };
     Message {
         role: "system".into(),
         content: Some(format!(
-            "{SUMMARY_PREFIX}\n- Older assistant/tool turns compacted: {removed_count} message(s).\n- Recent tool state: {}\n- Continue from retained recent messages and the active task brief.",
+            "{SUMMARY_PREFIX}\n- Older assistant/tool turns compacted: {removed_count} message(s).\n{task_line}\n- Recent tool state: {}\n- Continue from retained recent messages and the task-state capsule.",
             summarize_tool_results(tool_results)
         )),
         tool_calls: None,
         tool_call_id: None,
         reasoning_content: None,
     }
+}
+
+fn task_state_capsule(task_state: &str) -> String {
+    let trimmed = task_state.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let mut capsule: String = trimmed.chars().take(TASK_STATE_CAPSULE_CHARS).collect();
+    if trimmed.chars().count() > TASK_STATE_CAPSULE_CHARS {
+        capsule.push_str("\n... [task state capsule truncated]");
+    }
+    capsule
+        .lines()
+        .map(|line| format!("  {}", line.trim_end()))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn is_summary_message(message: &Message) -> bool {
@@ -143,6 +175,38 @@ mod tests {
         let user_index = messages.iter().position(|msg| msg.role == "user").unwrap();
 
         assert_ne!(messages[user_index + 1].role, "tool");
+    }
+
+    #[test]
+    fn compaction_summary_keeps_task_state_capsule() {
+        let mut messages = vec![msg("system", "rules"), msg("user", "do task")];
+        for i in 0..12 {
+            messages.push(msg("assistant", &format!("assistant {i}")));
+            messages.push(msg("tool", &format!("tool {i}")));
+        }
+        let tools = vec![tool("read_file", true, "inspected src/main.rs")];
+        let task_state = "Compact task brief:\nGoal:\n  build 1234\nDone:\n  inspected files\nPlan:\n  verify\nActive scope:\n  /tmp/sites/1234";
+
+        compact_messages_with_task_state(&mut messages, &tools, task_state).unwrap();
+        let summary = messages[1].content.as_deref().unwrap();
+
+        assert!(summary.contains("Task state capsule"));
+        assert!(summary.contains("Goal:"));
+        assert!(summary.contains("/tmp/sites/1234"));
+        assert!(summary.contains("Recent tool state"));
+    }
+
+    #[test]
+    fn task_state_capsule_is_bounded() {
+        let huge_state = format!(
+            "Goal:\n  {}\nTAIL",
+            "x".repeat(TASK_STATE_CAPSULE_CHARS + 200)
+        );
+
+        let capsule = task_state_capsule(&huge_state);
+
+        assert!(capsule.contains("task state capsule truncated"));
+        assert!(!capsule.contains("TAIL"));
     }
 
     fn msg(role: &str, content: &str) -> Message {

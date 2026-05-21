@@ -58,7 +58,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
         },
         Message {
             role: "system".into(),
-            content: Some(task_brief),
+            content: Some(task_brief.clone()),
             tool_calls: None,
             tool_call_id: None,
             reasoning_content: None,
@@ -224,7 +224,11 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             });
         }
         messages.extend(tool_msgs);
-        let _ = crate::transcript::compact_messages(&mut messages, &all_tool_results);
+        let _ = crate::transcript::compact_messages_with_task_state(
+            &mut messages,
+            &all_tool_results,
+            &task_brief,
+        );
     }
 
     if final_answer.is_none() {
