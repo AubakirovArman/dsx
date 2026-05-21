@@ -13,11 +13,17 @@ use ratatui::{
 
 impl App {
     pub fn draw(&self, frame: &mut Frame) {
+        let input_height = if self.pending_approval.is_some() {
+            6
+        } else {
+            3
+        };
+
         let main = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(3),
-                Constraint::Length(4),
+                Constraint::Length(input_height),
                 Constraint::Length(1),
             ])
             .split(frame.area());

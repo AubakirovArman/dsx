@@ -288,7 +288,24 @@ impl App {
             }
         }
 
-        let text = Text::from(lines);
+        let total_lines = lines.len();
+        let height = area.height.saturating_sub(2) as usize; // subtract border heights
+        
+        let max_scroll = total_lines.saturating_sub(height);
+        let current_scroll = if self.scroll_offset == 0 && max_scroll > 0 {
+            max_scroll
+        } else {
+            (self.scroll_offset as usize).min(max_scroll)
+        };
+
+        let end = (current_scroll + height).min(total_lines);
+        let visible_lines = if current_scroll < total_lines {
+            lines[current_scroll..end].to_vec()
+        } else {
+            lines
+        };
+
+        let text = Text::from(visible_lines);
         let paragraph = Paragraph::new(text)
             .block(
                 Block::default()
@@ -311,7 +328,7 @@ impl App {
                 Language::English => " ⚠️  SECURITY AUTHORIZATION REQUIRED:\n  Tool: [{}] wants to run in your workspace.\n  Arguments: {}\n  ▸ Press [Y] to APPROVE (Allow)  |  [N] to DENY (Reject)",
             };
             let alert_text = format_body
-                .replace("{}", &approval.tool_name)
+                .replacen("{}", &approval.tool_name, 1)
                 .replacen("{}", &approval.arguments, 1);
 
             Paragraph::new(alert_text)

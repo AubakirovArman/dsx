@@ -426,6 +426,7 @@ async fn run_tui(
                             let mut a = app.lock().unwrap();
                             task = a.input.clone();
                             a.input.clear();
+                            a.scroll_offset = 0;
                             if task.trim().is_empty() {
                                 continue;
                             }
@@ -551,17 +552,40 @@ async fn run_tui(
                             }
                         }
                     }
+                    KeyCode::Up => {
+                        let mut a = app.lock().unwrap();
+                        if a.input.is_empty() {
+                            a.scroll_offset = a.scroll_offset.saturating_add(1); // going up increments the scroll offset backwards!
+                        }
+                    }
+                    KeyCode::Down => {
+                        let mut a = app.lock().unwrap();
+                        if a.input.is_empty() {
+                            a.scroll_offset = a.scroll_offset.saturating_sub(1);
+                        }
+                    }
+                    KeyCode::PageUp => {
+                        let mut a = app.lock().unwrap();
+                        a.scroll_offset = a.scroll_offset.saturating_add(10);
+                    }
+                    KeyCode::PageDown => {
+                        let mut a = app.lock().unwrap();
+                        a.scroll_offset = a.scroll_offset.saturating_sub(10);
+                    }
                     KeyCode::Char(ch) => {
                         let mut a = app.lock().unwrap();
                         a.input.push(ch);
+                        a.scroll_offset = 0;
                     }
                     KeyCode::Backspace => {
                         let mut a = app.lock().unwrap();
                         a.input.pop();
+                        a.scroll_offset = 0;
                     }
                     KeyCode::Esc => {
                         let mut a = app.lock().unwrap();
                         a.input.clear();
+                        a.scroll_offset = 0;
                     }
                     _ => {}
                 }
