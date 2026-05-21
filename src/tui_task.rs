@@ -65,11 +65,16 @@ struct PreparedTask {
 fn prepare_task(app: &SharedApp, project_root: &Path, api_key: &str) -> Option<PreparedTask> {
     let mut app = app.lock().unwrap();
     let task = app.input.clone();
-    app.input.clear();
-    app.scroll_offset = 0;
     if task.trim().is_empty() {
+        app.scroll_offset = 0;
         return None;
     }
+    if let Some(message) = task_start_blocker(&app) {
+        app.add_message("system", message);
+        return None;
+    }
+    app.input.clear();
+    app.scroll_offset = 0;
     let mode = dsx_core::types::PermissionMode::parse(&app.mode)
         .unwrap_or(dsx_core::types::PermissionMode::Ask);
     let active_root = dsx_agent::scope::resolve_task_scope(project_root, &task)
@@ -125,6 +130,16 @@ fn persist_user_message(
     }
 }
 
+fn task_start_blocker(app: &dsx_tui::App) -> Option<&'static str> {
+    if app.pending_approval.is_some() {
+        return Some("Agent is waiting for tool approval; answer it before starting a new task.");
+    }
+    if matches!(app.agent_task, dsx_tui::AgentTask::Running(_)) {
+        return Some("Agent is already running; wait for the current task to finish.");
+    }
+    None
+}
+
 fn finish_task(
     app: SharedApp,
     session_id: Option<String>,
@@ -163,5 +178,52 @@ fn finish_task(
                 )
                 .await;
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn prepare_task_blocks_parallel_run_and_keeps_input() {
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        {
+            let mut app = app.lock().unwrap();
+            app.input = "second task".into();
+            app.agent_task = dsx_tui::AgentTask::Running("first task".into());
+        }
+
+        let prepared = prepare_task(&app, std::path::Path::new("/tmp"), "key");
+
+        assert!(prepared.is_none());
+        let app = app.lock().unwrap();
+        assert_eq!(app.input, "second task");
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("already running"))
+        );
+    }
+
+    #[test]
+    fn prepare_task_allows_idle_task() {
+        let root = std::env::temp_dir().join("dsx_prepare_task_idle");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        app.lock().unwrap().input = "do work".into();
+
+        let prepared = prepare_task(&app, &root, "key").unwrap();
+
+        assert_eq!(prepared.task, "do work");
+        assert_eq!(prepared.api_key, "key");
+        assert!(matches!(
+            app.lock().unwrap().agent_task,
+            dsx_tui::AgentTask::Running(_)
+        ));
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
