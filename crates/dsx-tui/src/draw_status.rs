@@ -10,6 +10,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::Paragraph,
 };
+use std::path::Path;
 
 impl App {
     pub fn draw_status(&self, frame: &mut Frame, area: Rect) {
@@ -59,13 +60,21 @@ impl App {
                 plain_owned(self.tokens.to_string()),
                 plain(" | cost: "),
                 strong_owned(cost),
+                plain(" | scope: "),
+                strong_owned(scope_badge(self)),
                 plain(" | fuse: "),
                 plain_owned(self.budget_status.clone()),
                 plain(" | "),
             ]);
             spans.extend(main_keys(self.lang, true, running));
         } else if area.width >= 80 {
-            spans.extend([plain(" | cost: "), strong_owned(cost), plain(" | ")]);
+            spans.extend([
+                plain(" | cost: "),
+                strong_owned(cost),
+                plain(" | scope: "),
+                strong_owned(scope_badge(self)),
+                plain(" | "),
+            ]);
             spans.extend(main_keys(self.lang, false, running));
         } else {
             spans.extend([
@@ -79,6 +88,23 @@ impl App {
         let status_bar = Paragraph::new(Line::from(spans))
             .style(Style::default().bg(Color::Black).fg(Color::Gray));
         frame.render_widget(status_bar, area);
+    }
+}
+
+fn scope_badge(app: &App) -> String {
+    let active = app.scope_lock.active_scope.trim();
+    if active.is_empty() {
+        return "none".into();
+    }
+    let label = Path::new(active)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(active);
+    match app.scope_lock.status.as_str() {
+        "Narrowed" => format!("narrow:{label}"),
+        "Blocked" => format!("blocked:{label}"),
+        _ => format!("wide:{label}"),
     }
 }
 
@@ -175,4 +201,26 @@ fn plain(label: &'static str) -> Span<'static> {
 
 fn plain_owned(label: String) -> Span<'static> {
     Span::raw(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scope_badge_shows_narrow_active_folder() {
+        let mut app = App::new();
+        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites/1234", true);
+
+        assert_eq!(scope_badge(&app), "narrow:1234");
+    }
+
+    #[test]
+    fn scope_badge_marks_blocked_scope() {
+        let mut app = App::new();
+        app.scope_lock.active_scope = "/tmp/sites".into();
+        app.scope_lock.status = "Blocked".into();
+
+        assert_eq!(scope_badge(&app), "blocked:sites");
+    }
 }

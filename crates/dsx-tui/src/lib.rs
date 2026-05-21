@@ -147,14 +147,11 @@ impl App {
             next_step: "Waiting for first model/tool event.".into(),
             active_scope: active_scope.into(),
         };
+        let status = if narrowed { "Narrowed" } else { "Wide" };
         self.scope_lock = ScopeLockPanel {
             launch_scope: launch_scope.into(),
             active_scope: active_scope.into(),
-            status: if narrowed {
-                "Narrowed".into()
-            } else {
-                "Wide".into()
-            },
+            status: status.into(),
             reason: if narrowed {
                 "Task selected a subfolder; tools and indexing are locked there.".into()
             } else {
@@ -168,6 +165,10 @@ impl App {
         };
         let next_step = self.task_brief.next_step.clone();
         self.upsert_folder_note(active_scope, "Task accepted in this folder.", &next_step);
+        self.add_message(
+            "system",
+            &scope_contract_message(launch_scope, active_scope, status),
+        );
         self.tool_timeline.clear();
         self.compaction_events = 0;
         self.compacted_messages = 0;
@@ -188,6 +189,13 @@ impl Default for App {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn scope_contract_message(launch_scope: &str, active_scope: &str, status: &str) -> String {
+    format!(
+        "Scope contract: launch={} -> active={} ({status}); tools, indexing, and memory stay inside active scope.",
+        launch_scope, active_scope
+    )
 }
 
 fn truncate_chars(value: &str, limit: usize) -> String {

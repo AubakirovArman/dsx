@@ -53,6 +53,12 @@ mod tests {
         assert_eq!(app.scope_lock.active_scope, "/tmp/sites/1234");
         assert_eq!(app.scope_lock.status, "Narrowed");
         assert!(app.scope_lock.warning.is_empty());
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("Scope contract")
+                    && msg.content.contains("/tmp/sites/1234"))
+        );
     }
 
     #[test]
