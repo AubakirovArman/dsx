@@ -10,6 +10,8 @@ pub mod tui_runner;
 pub mod tui_settings_keys;
 pub mod tui_state;
 pub mod tui_task;
+#[cfg(test)]
+mod tui_task_tests;
 
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};

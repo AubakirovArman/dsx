@@ -37,6 +37,9 @@ pub struct App {
     pub api_base: String,
     pub api_key: String,
     pub budget_status: String,
+    pub active_run_id: Option<u64>,
+    pub next_run_id: u64,
+    pub agent_abort: Option<tokio::task::AbortHandle>,
     pub task_brief: TaskBriefPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
 }
@@ -84,6 +87,9 @@ impl App {
             api_base: "https://api.deepseek.com".to_string(),
             api_key: String::new(),
             budget_status: String::new(),
+            active_run_id: None,
+            next_run_id: 0,
+            agent_abort: None,
             task_brief: TaskBriefPanel::default(),
             tool_timeline: Vec::new(),
         }

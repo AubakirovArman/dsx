@@ -26,6 +26,10 @@ pub async fn handle_key(
 
     match key.code {
         KeyCode::Char('c') if ctrl(key) => Ok(KeyOutcome::Quit),
+        KeyCode::Char('k') if ctrl(key) => {
+            crate::tui_task::stop_agent_task(app);
+            Ok(KeyOutcome::Continue)
+        }
         KeyCode::Enter => {
             crate::tui_task::start_agent_task(app, project_root, api_key, session_id, pool, rt)
                 .await?;
@@ -69,6 +73,10 @@ fn handle_approval_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
         }
         KeyCode::Char('n') | KeyCode::Char('N') => {
             answer_approval(app, false);
+            KeyOutcome::Continue
+        }
+        KeyCode::Char('k') if ctrl(key) => {
+            crate::tui_task::stop_agent_task(app);
             KeyOutcome::Continue
         }
         KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,

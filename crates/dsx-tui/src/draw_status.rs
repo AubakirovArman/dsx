@@ -21,6 +21,7 @@ impl App {
             "plan-only" => Color::LightBlue,
             _ => Color::DarkGray,
         };
+        let running = matches!(self.agent_task, AgentTask::Running(_));
         let cost = if self.cost > 0.0 {
             format!("${:.4}", self.cost)
         } else {
@@ -62,10 +63,10 @@ impl App {
                 plain_owned(self.budget_status.clone()),
                 plain(" | "),
             ]);
-            spans.extend(main_keys(self.lang, true));
+            spans.extend(main_keys(self.lang, true, running));
         } else if area.width >= 80 {
             spans.extend([plain(" | cost: "), strong_owned(cost), plain(" | ")]);
-            spans.extend(main_keys(self.lang, false));
+            spans.extend(main_keys(self.lang, false, running));
         } else {
             spans.extend([
                 plain(" | "),
@@ -133,10 +134,13 @@ fn settings_keys(lang: Language) -> Vec<Span<'static>> {
     ]
 }
 
-fn main_keys(lang: Language, include_tree: bool) -> Vec<Span<'static>> {
+fn main_keys(lang: Language, include_tree: bool, include_stop: bool) -> Vec<Span<'static>> {
     let mut spans = vec![key("Ctrl+S"), plain(tr(lang, "status_settings_toggle"))];
     if include_tree {
         spans.extend([key("Ctrl+T"), plain(tr(lang, "status_tree_toggle"))]);
+    }
+    if include_stop {
+        spans.extend([key("Ctrl+K"), plain(tr(lang, "status_stop_toggle"))]);
     }
     spans.extend([
         key("Ctrl+D"),

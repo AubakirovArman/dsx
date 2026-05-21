@@ -5,6 +5,7 @@ use crate::tui_state::SharedApp;
 use std::path::{Path, PathBuf};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
+use tokio::task::AbortHandle;
 
 pub async fn start_agent_task(
     app: &SharedApp,
@@ -23,7 +24,8 @@ pub async fn start_agent_task(
     let api_base = app.lock().unwrap().api_base.clone();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let (approval_tx, mut approval_rx) = mpsc::unbounded_channel();
-    spawn_agent(rt, prepared.clone(), api_base, Some(approval_tx), tx);
+    let abort = spawn_agent(rt, prepared.clone(), api_base, Some(approval_tx), tx);
+    app.lock().unwrap().agent_abort = Some(abort);
 
     let approval_app = app.clone();
     rt.spawn(async move {
@@ -47,14 +49,43 @@ pub async fn start_agent_task(
                 .unwrap()
                 .handle_stream_event(&convert_event(&event));
         }
-        finish_task(stream_app, session_id, pool, prepared.active_root, rt_copy);
+        finish_task(
+            stream_app,
+            session_id,
+            pool,
+            prepared.active_root,
+            prepared.run_id,
+            rt_copy,
+        );
     });
 
     Ok(())
 }
 
+pub fn stop_agent_task(app: &SharedApp) -> bool {
+    let mut app = app.lock().unwrap();
+    let Some(abort) = app.agent_abort.take() else {
+        app.add_message("system", "No active agent run to stop.");
+        return false;
+    };
+
+    abort.abort();
+    if let Some(approval) = app.pending_approval.take() {
+        let _ = approval.tx.send(false);
+    }
+    app.active_run_id = None;
+    app.current_reasoning.clear();
+    app.agent_task = dsx_tui::AgentTask::Error("cancelled by user".into());
+    app.task_brief.done = "Run cancelled by user.".into();
+    app.task_brief.last_changes = "Abort requested from TUI.".into();
+    app.task_brief.next_step = "Review partial output or enter a narrower task.".into();
+    app.add_message("system", "⏹ Agent run cancelled by user.");
+    true
+}
+
 #[derive(Clone)]
 struct PreparedTask {
+    run_id: u64,
     task: String,
     api_key: String,
     project_root: PathBuf,
@@ -77,6 +108,9 @@ fn prepare_task(app: &SharedApp, project_root: &Path, api_key: &str) -> Option<P
     app.scroll_offset = 0;
     let mode = dsx_core::types::PermissionMode::parse(&app.mode)
         .unwrap_or(dsx_core::types::PermissionMode::Ask);
+    let run_id = app.next_run_id.saturating_add(1);
+    app.next_run_id = run_id;
+    app.active_run_id = Some(run_id);
     let active_root = dsx_agent::scope::resolve_task_scope(project_root, &task)
         .map(|scope| scope.active_root)
         .unwrap_or_else(|_| project_root.to_path_buf());
@@ -85,6 +119,7 @@ fn prepare_task(app: &SharedApp, project_root: &Path, api_key: &str) -> Option<P
     app.agent_task = dsx_tui::AgentTask::Running(task.clone());
 
     Some(PreparedTask {
+        run_id,
         task,
         api_key: api_key.to_string(),
         project_root: project_root.to_path_buf(),
@@ -99,7 +134,7 @@ fn spawn_agent(
     api_base: String,
     approval_tx: Option<mpsc::UnboundedSender<dsx_agent::ApprovalRequest>>,
     tx: mpsc::UnboundedSender<dsx_provider::streaming::StreamEvent>,
-) {
+) -> AbortHandle {
     rt.spawn(async move {
         let config = dsx_agent::AgentConfig {
             project_root: task.project_root,
@@ -110,7 +145,8 @@ fn spawn_agent(
             approval_tx,
         };
         let _ = dsx_agent::run_streaming(&task.task, &config, tx).await;
-    });
+    })
+    .abort_handle()
 }
 
 fn persist_user_message(
@@ -137,24 +173,39 @@ fn task_start_blocker(app: &dsx_tui::App) -> Option<&'static str> {
     if matches!(app.agent_task, dsx_tui::AgentTask::Running(_)) {
         return Some("Agent is already running; wait for the current task to finish.");
     }
+    if app.agent_abort.is_some() {
+        return Some("Agent is still stopping; wait for cleanup to finish.");
+    }
     None
 }
 
-fn finish_task(
+pub(crate) fn finish_task(
     app: SharedApp,
     session_id: Option<String>,
     pool: Option<sqlx::SqlitePool>,
     active_root: PathBuf,
+    run_id: u64,
     rt: Handle,
 ) {
     let (assistant, brief, tools, cost, tokens) = {
         let mut app = app.lock().unwrap();
-        app.agent_task = dsx_tui::AgentTask::Done("ready".into());
-        let assistant = app
-            .messages
-            .last()
-            .filter(|m| m.role == "assistant")
-            .cloned();
+        if app.active_run_id != Some(run_id) {
+            return;
+        }
+        app.active_run_id = None;
+        app.agent_abort = None;
+        let completed = matches!(app.agent_task, dsx_tui::AgentTask::Running(_));
+        if completed {
+            app.agent_task = dsx_tui::AgentTask::Done("ready".into());
+        }
+        let assistant = completed
+            .then(|| {
+                app.messages
+                    .last()
+                    .filter(|m| m.role == "assistant")
+                    .cloned()
+            })
+            .flatten();
         (
             assistant,
             app.task_brief.clone(),
@@ -219,6 +270,8 @@ mod tests {
 
         assert_eq!(prepared.task, "do work");
         assert_eq!(prepared.api_key, "key");
+        assert_eq!(prepared.run_id, 1);
+        assert_eq!(app.lock().unwrap().active_run_id, Some(1));
         assert!(matches!(
             app.lock().unwrap().agent_task,
             dsx_tui::AgentTask::Running(_)
