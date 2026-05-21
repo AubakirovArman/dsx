@@ -23,6 +23,10 @@ pub struct CliArgs {
     #[arg(short = 'b', long)]
     pub api_base: Option<String>,
 
+    /// Intentionally allow agent runs across a container workspace.
+    #[arg(long)]
+    pub allow_wide_scope: bool,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }

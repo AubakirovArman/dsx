@@ -28,11 +28,13 @@ pub fn configure_initial_app(
     initial_mode: dsx_core::types::PermissionMode,
     api_base: String,
     api_key: String,
+    allow_wide_scope: bool,
     history_events: HistoryEvents,
 ) {
     let mut app = app.lock().unwrap();
     app.api_base = api_base;
     app.api_key = api_key;
+    app.allow_wide_scope = allow_wide_scope;
     app.mode = initial_mode.as_str().to_string();
     let budget_status = dsx_agent::budget::format_limits(dsx_agent::budget::current_limits());
     app.budget_status = budget_status.clone();
@@ -47,6 +49,9 @@ pub fn configure_initial_app(
         "system",
         "Semantic indexing deferred until active task scope.",
     );
+    if allow_wide_scope {
+        app.add_message("system", "Wide scope guard disabled by explicit policy.");
+    }
     app.add_message(
         "system",
         &format!(

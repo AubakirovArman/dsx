@@ -1,6 +1,8 @@
 //! DSX Code — terminal coding agent entrypoint.
 
 pub mod cli;
+#[cfg(test)]
+mod cli_tests;
 pub mod context_preview;
 #[cfg(test)]
 mod context_preview_tests;
@@ -54,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let app_config = load_config_or_default(&project_root);
     let mode = initial_mode(&cli, &app_config);
     let api_key = api_key(&cli, &app_config);
+    let allow_wide_scope = cli.allow_wide_scope || app_config.scope.allow_wide;
     let api_base = cli
         .api_base
         .clone()
@@ -67,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
                 api_key.unwrap_or_default(),
                 api_base,
                 mode,
+                allow_wide_scope,
                 session_id,
                 pool,
             )
@@ -78,7 +82,7 @@ async fn main() -> anyhow::Result<()> {
             };
             let desc = task.join(" ");
             println!("Planning: {}", task_preview(&desc));
-            run_plan(project_root, key, api_base, &desc, mode).await?;
+            run_plan(project_root, key, api_base, &desc, mode, allow_wide_scope).await?;
         }
         Some(Command::Edit { task }) => {
             let Some(key) = require_api_key(api_key) else {
@@ -86,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
             };
             let desc = task.join(" ");
             println!("Editing: {}", task_preview(&desc));
-            run_edit(project_root, key, api_base, &desc, mode).await?;
+            run_edit(project_root, key, api_base, &desc, mode, allow_wide_scope).await?;
         }
         Some(Command::Eval {
             tasks_file,
@@ -111,7 +115,15 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,
         Some(Command::Workspace { action }) => {
-            run_workspace_action(project_root, api_key, api_base, mode, action).await?
+            run_workspace_action(
+                project_root,
+                api_key,
+                api_base,
+                mode,
+                allow_wide_scope,
+                action,
+            )
+            .await?
         }
     }
     Ok(())
@@ -200,6 +212,7 @@ async fn run_workspace_action(
     api_key: Option<String>,
     api_base: String,
     mode: dsx_core::types::PermissionMode,
+    allow_wide_scope: bool,
     action: Option<WorkspaceAction>,
 ) -> anyhow::Result<()> {
     match action {
@@ -218,7 +231,7 @@ async fn run_workspace_action(
             let Some(key) = require_api_key(api_key) else {
                 return Ok(());
             };
-            resume_session(project_root, key, api_base, mode, id).await?;
+            resume_session(project_root, key, api_base, mode, allow_wide_scope, id).await?;
         }
     }
     Ok(())
@@ -229,6 +242,7 @@ async fn resume_session(
     api_key: String,
     api_base: String,
     fallback_mode: dsx_core::types::PermissionMode,
+    allow_wide_scope: bool,
     id: String,
 ) -> anyhow::Result<()> {
     let db_path = project_root.join(".dsx").join("sessions.db");
@@ -250,6 +264,7 @@ async fn resume_session(
                 api_key,
                 api_base,
                 mode,
+                allow_wide_scope,
                 Some(session.id),
                 Some(pool),
             )

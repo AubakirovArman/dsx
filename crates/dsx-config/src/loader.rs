@@ -68,6 +68,9 @@ fn merge_layer(config: &mut AppConfig, layer: AppConfigLayer) {
         apply(routing.reviewer, &mut config.routing.reviewer);
         apply(routing.summarizer, &mut config.routing.summarizer);
     }
+    if let Some(scope) = layer.scope {
+        apply(scope.allow_wide, &mut config.scope.allow_wide);
+    }
     if let Some(project) = layer.project {
         let target = config.project.get_or_insert_with(ProjectSettings::default);
         if let Some(name) = project.name {
@@ -146,6 +149,9 @@ openai_base_url = "https://global.example/v1"
 [permissions]
 allow = ["git status"]
 deny = ["rm -rf *"]
+
+[scope]
+allow_wide = true
 "#,
         )
         .unwrap();
@@ -157,6 +163,9 @@ default_mode = "auto"
 
 [permissions]
 allow = ["cargo test"]
+
+[scope]
+allow_wide = false
 "#,
         )
         .unwrap();
@@ -165,6 +174,7 @@ allow = ["cargo test"]
 
         assert_eq!(config.app.default_mode, "auto");
         assert_eq!(config.app.theme, "light");
+        assert!(!config.scope.allow_wide);
         assert_eq!(config.provider.api_key_env, "GLOBAL_DEEPSEEK_KEY");
         let permissions = config.permissions.unwrap();
         assert_eq!(

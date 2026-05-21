@@ -11,6 +11,7 @@ pub(crate) struct AppConfigLayer {
     pub(crate) provider: Option<ProviderSettingsLayer>,
     pub(crate) models: Option<ModelSettingsLayer>,
     pub(crate) routing: Option<RoutingSettingsLayer>,
+    pub(crate) scope: Option<ScopeSettingsLayer>,
     pub(crate) project: Option<ProjectSettingsLayer>,
     pub(crate) permissions: Option<PermissionsLayerPatch>,
 }
@@ -56,6 +57,11 @@ pub(crate) struct RoutingSettingsLayer {
     pub(crate) classifier: Option<String>,
     pub(crate) reviewer: Option<String>,
     pub(crate) summarizer: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct ScopeSettingsLayer {
+    pub(crate) allow_wide: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]

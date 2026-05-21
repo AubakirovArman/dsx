@@ -20,6 +20,7 @@ mod tests {
             dsx_core::types::PermissionMode::Ask,
             "https://api.deepseek.com".into(),
             String::new(),
+            false,
             None,
         );
 

@@ -94,6 +94,28 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn prepare_task_allows_wide_container_when_policy_enabled() {
+        let root = temp_root("dsx_prepare_allow_wide");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        {
+            let mut app = app.lock().unwrap();
+            app.input = "доработай проект".into();
+            app.allow_wide_scope = true;
+        }
+
+        let prepared = prepare_task(&app, &root, "key").unwrap();
+
+        assert_eq!(prepared.active_root, root.canonicalize().unwrap());
+        let app = app.lock().unwrap();
+        assert_eq!(app.active_run_id, Some(1));
+        assert_eq!(app.scope_lock.status, "Wide");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[tokio::test]
     async fn stop_agent_task_aborts_handle_and_clears_state() {
         let app = Arc::new(Mutex::new(dsx_tui::App::new()));

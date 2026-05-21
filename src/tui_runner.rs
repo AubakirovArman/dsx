@@ -12,6 +12,7 @@ pub async fn run_tui(
     api_key: String,
     api_base: String,
     initial_mode: dsx_core::types::PermissionMode,
+    allow_wide_scope: bool,
     session_id: Option<String>,
     pool: Option<sqlx::SqlitePool>,
 ) -> anyhow::Result<()> {
@@ -31,6 +32,7 @@ pub async fn run_tui(
         initial_mode,
         api_base,
         api_key.clone(),
+        allow_wide_scope,
         history,
     );
     let folder_notes = crate::session_state::load_folder_notes(&project_root).await;

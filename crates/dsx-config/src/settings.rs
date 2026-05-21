@@ -11,6 +11,8 @@ pub struct AppConfig {
     pub models: ModelSettings,
     pub routing: RoutingSettings,
     #[serde(default)]
+    pub scope: ScopeSettings,
+    #[serde(default)]
     pub project: Option<ProjectSettings>,
     #[serde(default)]
     pub permissions: Option<PermissionsLayer>,
@@ -62,6 +64,12 @@ pub struct RoutingSettings {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ScopeSettings {
+    #[serde(default)]
+    pub allow_wide: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProjectSettings {
     pub name: Option<String>,
 }
@@ -106,6 +114,7 @@ impl Default for AppConfig {
                 reviewer: "fast".into(),
                 summarizer: "fast".into(),
             },
+            scope: ScopeSettings::default(),
             project: None,
             permissions: None,
         }

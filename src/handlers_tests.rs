@@ -11,7 +11,7 @@ mod tests {
         std::fs::create_dir_all(root.join("1234")).unwrap();
         std::fs::create_dir_all(root.join("other")).unwrap();
 
-        let result = prepare_cli_agent_scope(&root, "доработай проект");
+        let result = prepare_cli_agent_scope(&root, "доработай проект", false);
 
         assert!(result.is_err());
         assert!(
@@ -25,6 +25,19 @@ mod tests {
     }
 
     #[test]
+    fn cli_agent_scope_allows_explicit_policy_override() {
+        let root = temp_root("dsx_cli_scope_allow_wide");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+
+        let scope = prepare_cli_agent_scope(&root, "доработай проект", true).unwrap();
+
+        assert!(!scope.narrowed);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn cli_agent_scope_allows_explicit_child_folder() {
         let root = temp_root("dsx_cli_scope_narrow");
         let target = root.join("1234");
@@ -32,7 +45,7 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
         std::fs::create_dir_all(root.join("other")).unwrap();
 
-        let scope = prepare_cli_agent_scope(&root, "доработай 1234").unwrap();
+        let scope = prepare_cli_agent_scope(&root, "доработай 1234", false).unwrap();
 
         assert!(scope.narrowed);
         assert_eq!(scope.active_root, target.canonicalize().unwrap());

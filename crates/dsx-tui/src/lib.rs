@@ -53,6 +53,7 @@ pub struct App {
     pub scope_lock: ScopeLockPanel,
     pub folder_notes: Vec<FolderNote>,
     pub tool_timeline: Vec<ToolTimelineEntry>,
+    pub allow_wide_scope: bool,
 }
 
 impl App {
@@ -111,6 +112,7 @@ impl App {
             scope_lock: ScopeLockPanel::default(),
             folder_notes: Vec::new(),
             tool_timeline: Vec::new(),
+            allow_wide_scope: false,
         }
     }
 

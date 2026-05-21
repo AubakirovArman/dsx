@@ -6,12 +6,17 @@ pub(crate) fn wide_scope_blocker(
     launch_root: &Path,
     task: &str,
     narrowed: bool,
+    allow_wide_scope: bool,
 ) -> Option<&'static str> {
-    if narrowed || explicit_wide_intent(task) || !looks_like_container(launch_root) {
+    if allow_wide_scope
+        || narrowed
+        || explicit_wide_intent(task)
+        || !looks_like_container(launch_root)
+    {
         return None;
     }
     Some(
-        "Wide container workspace blocked. Add an explicit child folder like ./1234, or say whole workspace for an intentional wide task.",
+        "Wide container workspace blocked. Add an explicit child folder like ./1234, pass --allow-wide-scope, set [scope] allow_wide = true, or say whole workspace for an intentional wide task.",
     )
 }
 
@@ -115,9 +120,19 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("1234")).unwrap();
 
-        let blocked = wide_scope_blocker(&root, "почини проект", false);
+        let blocked = wide_scope_blocker(&root, "почини проект", false, false);
 
         assert!(blocked.unwrap().contains("child folder"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn allows_explicit_policy_override() {
+        let root = temp_root("dsx_scope_policy_override");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+
+        assert!(wide_scope_blocker(&root, "почини проект", false, true).is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -128,7 +143,7 @@ mod tests {
         std::fs::create_dir_all(root.join("src")).unwrap();
         std::fs::write(root.join("Cargo.toml"), "[package]\n").unwrap();
 
-        assert!(wide_scope_blocker(&root, "почини проект", false).is_none());
+        assert!(wide_scope_blocker(&root, "почини проект", false, false).is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -138,7 +153,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("1234")).unwrap();
 
-        assert!(wide_scope_blocker(&root, "проверь весь воркспейс целиком", false).is_none());
+        assert!(
+            wide_scope_blocker(&root, "проверь весь воркспейс целиком", false, false).is_none()
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -149,7 +166,7 @@ mod tests {
         std::fs::create_dir_all(root.join("assets")).unwrap();
         std::fs::write(root.join("index.html"), "<main></main>").unwrap();
 
-        assert!(wide_scope_blocker(&root, "доработай сайт", false).is_none());
+        assert!(wide_scope_blocker(&root, "доработай сайт", false, false).is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -159,7 +176,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("1234")).unwrap();
 
-        assert!(wide_scope_blocker(&root, "почини 1234", true).is_none());
+        assert!(wide_scope_blocker(&root, "почини 1234", true, false).is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
