@@ -12,8 +12,8 @@ pub mod i18n;
 pub mod types;
 
 pub use types::{
-    AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval, TaskBriefPanel,
-    ToolTimelineEntry,
+    AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval, ScopeLockPanel,
+    TaskBriefPanel, ToolTimelineEntry,
 };
 
 /// Shared app state.
@@ -49,6 +49,7 @@ pub struct App {
     pub compacted_messages: u64,
     pub estimated_tokens_saved: u64,
     pub task_brief: TaskBriefPanel,
+    pub scope_lock: ScopeLockPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
 }
 
@@ -105,6 +106,7 @@ impl App {
             compacted_messages: 0,
             estimated_tokens_saved: 0,
             task_brief: TaskBriefPanel::default(),
+            scope_lock: ScopeLockPanel::default(),
             tool_timeline: Vec::new(),
         }
     }
@@ -189,6 +191,16 @@ impl App {
     }
 
     pub fn begin_task(&mut self, task: &str, active_scope: &str) {
+        self.begin_task_scoped(task, active_scope, active_scope, false);
+    }
+
+    pub fn begin_task_scoped(
+        &mut self,
+        task: &str,
+        launch_scope: &str,
+        active_scope: &str,
+        narrowed: bool,
+    ) {
         self.run_start_tokens = self.tokens;
         self.run_start_cost = self.cost;
         self.task_brief = TaskBriefPanel {
@@ -198,6 +210,25 @@ impl App {
             last_changes: "No tool result yet.".into(),
             next_step: "Waiting for first model/tool event.".into(),
             active_scope: active_scope.into(),
+        };
+        self.scope_lock = ScopeLockPanel {
+            launch_scope: launch_scope.into(),
+            active_scope: active_scope.into(),
+            status: if narrowed {
+                "Narrowed".into()
+            } else {
+                "Wide".into()
+            },
+            reason: if narrowed {
+                "Task selected a subfolder; tools and indexing are locked there.".into()
+            } else {
+                "No explicit subfolder was selected; launch workspace is active.".into()
+            },
+            warning: if narrowed {
+                String::new()
+            } else {
+                "Review the task if you expected a narrower folder like ./1234.".into()
+            },
         };
         self.tool_timeline.clear();
         self.compaction_events = 0;

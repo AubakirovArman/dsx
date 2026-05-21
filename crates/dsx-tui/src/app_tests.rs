@@ -42,4 +42,26 @@ mod tests {
         assert_eq!(app.compacted_messages, 0);
         assert_eq!(app.estimated_tokens_saved, 0);
     }
+
+    #[test]
+    fn begin_task_scoped_updates_visible_scope_lock() {
+        let mut app = App::new();
+
+        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites/1234", true);
+
+        assert_eq!(app.scope_lock.launch_scope, "/tmp/sites");
+        assert_eq!(app.scope_lock.active_scope, "/tmp/sites/1234");
+        assert_eq!(app.scope_lock.status, "Narrowed");
+        assert!(app.scope_lock.warning.is_empty());
+    }
+
+    #[test]
+    fn begin_task_scoped_warns_when_scope_is_wide() {
+        let mut app = App::new();
+
+        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites", false);
+
+        assert_eq!(app.scope_lock.status, "Wide");
+        assert!(app.scope_lock.warning.contains("narrower folder"));
+    }
 }

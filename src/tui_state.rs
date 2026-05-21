@@ -36,6 +36,8 @@ pub fn configure_initial_app(
     app.mode = initial_mode.as_str().to_string();
     let budget_status = dsx_agent::budget::format_limits(dsx_agent::budget::current_limits());
     app.budget_status = budget_status.clone();
+    app.scope_lock.launch_scope = project_root.display().to_string();
+    app.scope_lock.active_scope = project_root.display().to_string();
     app.add_message(
         "system",
         &format!("Launch workspace: {}", project_root.display()),

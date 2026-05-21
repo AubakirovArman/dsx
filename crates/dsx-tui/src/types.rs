@@ -64,6 +64,27 @@ impl Default for TaskBriefPanel {
 }
 
 #[derive(Debug, Clone)]
+pub struct ScopeLockPanel {
+    pub launch_scope: String,
+    pub active_scope: String,
+    pub status: String,
+    pub reason: String,
+    pub warning: String,
+}
+
+impl Default for ScopeLockPanel {
+    fn default() -> Self {
+        Self {
+            launch_scope: String::new(),
+            active_scope: String::new(),
+            status: "Idle".into(),
+            reason: "No task has selected an active scope yet.".into(),
+            warning: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ToolTimelineEntry {
     pub name: String,
     pub status: String,

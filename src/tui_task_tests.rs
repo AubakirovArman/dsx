@@ -48,6 +48,29 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn prepare_task_updates_scope_lock_for_subfolder() {
+        let root = temp_root("dsx_prepare_scope_lock");
+        let target = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&target).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        app.lock().unwrap().input = "используй папку 1234 только".into();
+
+        let prepared = prepare_task(&app, &root, "key").unwrap();
+
+        assert_eq!(prepared.active_root, target.canonicalize().unwrap());
+        let app = app.lock().unwrap();
+        assert_eq!(app.scope_lock.launch_scope, root.display().to_string());
+        assert_eq!(
+            app.scope_lock.active_scope,
+            target.canonicalize().unwrap().display().to_string()
+        );
+        assert_eq!(app.scope_lock.status, "Narrowed");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[tokio::test]
     async fn stop_agent_task_aborts_handle_and_clears_state() {
         let app = Arc::new(Mutex::new(dsx_tui::App::new()));

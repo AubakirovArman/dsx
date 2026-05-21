@@ -36,10 +36,15 @@ impl App {
     fn draw_workflow_panel(&self, frame: &mut Frame, area: Rect) {
         let split = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(56), Constraint::Percentage(44)])
+            .constraints([
+                Constraint::Percentage(44),
+                Constraint::Length(8),
+                Constraint::Min(6),
+            ])
             .split(area);
         self.draw_task_brief_panel(frame, split[0]);
-        self.draw_tool_timeline_panel(frame, split[1]);
+        self.draw_scope_lock_panel(frame, split[1]);
+        self.draw_tool_timeline_panel(frame, split[2]);
     }
 
     fn draw_task_brief_panel(&self, frame: &mut Frame, area: Rect) {
@@ -131,6 +136,38 @@ impl App {
 
         frame.render_widget(paragraph, area);
     }
+
+    fn draw_scope_lock_panel(&self, frame: &mut Frame, area: Rect) {
+        let s = &self.scope_lock;
+        let color = if s.status == "Narrowed" {
+            Color::LightGreen
+        } else {
+            Color::LightYellow
+        };
+        let mut lines = Vec::new();
+        push_inline(&mut lines, "Status", &s.status, color);
+        push_inline(&mut lines, "Launch", &s.launch_scope, Color::Gray);
+        push_inline(&mut lines, "Active", &s.active_scope, Color::LightCyan);
+        push_inline(&mut lines, "Why", &s.reason, Color::White);
+        if !s.warning.trim().is_empty() {
+            push_inline(&mut lines, "Check", &s.warning, Color::LightYellow);
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(color))
+                    .title(Span::styled(
+                        " Scope Lock ",
+                        Style::default().fg(color).add_modifier(Modifier::BOLD),
+                    )),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, area);
+    }
 }
 
 fn push_field(lines: &mut Vec<Line<'_>>, label: &'static str, value: &str, color: Color) {
@@ -144,4 +181,14 @@ fn push_field(lines: &mut Vec<Line<'_>>, label: &'static str, value: &str, color
             Span::styled(line.to_string(), Style::default().fg(Color::White)),
         ]));
     }
+}
+
+fn push_inline(lines: &mut Vec<Line<'_>>, label: &'static str, value: &str, color: Color) {
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("{label}: "),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(value.to_string(), Style::default().fg(Color::White)),
+    ]));
 }

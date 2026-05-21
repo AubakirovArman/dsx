@@ -6,6 +6,7 @@ pub mod event_convert;
 pub mod handlers;
 pub mod run_ledger;
 pub mod session_state;
+pub mod task_scope;
 pub mod tui_keys;
 pub mod tui_runner;
 pub mod tui_settings_keys;

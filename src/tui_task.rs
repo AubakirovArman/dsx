@@ -3,9 +3,7 @@
 use crate::event_convert::convert_event;
 use crate::tui_state::SharedApp;
 use std::path::{Path, PathBuf};
-use tokio::runtime::Handle;
-use tokio::sync::mpsc;
-use tokio::task::AbortHandle;
+use tokio::{runtime::Handle, sync::mpsc, task::AbortHandle};
 
 pub async fn start_agent_task(
     app: &SharedApp,
@@ -126,10 +124,13 @@ pub(crate) fn prepare_task(
     let run_id = app.next_run_id.saturating_add(1);
     app.next_run_id = run_id;
     app.active_run_id = Some(run_id);
-    let active_root = dsx_agent::scope::resolve_task_scope(project_root, &task)
-        .map(|scope| scope.active_root)
-        .unwrap_or_else(|_| project_root.to_path_buf());
-    app.begin_task(&task, &active_root.display().to_string());
+    let scope = crate::task_scope::resolve_task_scope(project_root, &task);
+    app.begin_task_scoped(
+        &task,
+        &scope.launch_label,
+        &scope.active_label,
+        scope.narrowed,
+    );
     app.add_message("user", &task);
     app.agent_task = dsx_tui::AgentTask::Running(task.clone());
 
@@ -139,7 +140,7 @@ pub(crate) fn prepare_task(
         task,
         api_key: api_key.to_string(),
         project_root: project_root.to_path_buf(),
-        active_root,
+        active_root: scope.active_root,
         mode,
     })
 }
