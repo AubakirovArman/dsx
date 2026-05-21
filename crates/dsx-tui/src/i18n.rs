@@ -6,7 +6,9 @@ use crate::types::Language;
 pub fn tr(lang: Language, key: &str) -> &'static str {
     match lang {
         Language::English => match key {
-            "welcome_msg" => "DSX Code — DeepSeek V4 coding agent.\nType a task and press Enter. Ctrl+C to quit.",
+            "welcome_msg" => {
+                "DSX Code — DeepSeek V4 coding agent.\nType a task and press Enter. Ctrl+C to quit."
+            }
             "sidebar_title" => " 📁 WORKSPACE ",
             "reasoning_title" => " 🧠 THOUGHT PROCESS ",
             "chat_title" => " 💻 COGNITIVE CORE ",
@@ -17,7 +19,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "input_auth_title" => " 🔒 SECURE AUTHORIZATION GATEWAY ",
             "settings_title" => " ⚙️  SYSTEM SETTINGS CONFIGURATOR ",
             "settings_header_banner" => "  DSX CODE SYSTEM CONFIGURATOR  ",
-            "settings_header_desc" => "   Use [↑] / [↓] Arrow keys to navigate, [←] / [→] to modify values, and [Esc] to return.",
+            "settings_header_desc" => {
+                "   Use [↑] / [↓] Arrow keys to navigate, [←] / [→] to modify values, and [Esc] to return."
+            }
             "settings_opt_security" => "SECURITY PROTECTION MODE:  ",
             "settings_opt_model" => "PRIMARY REASONING MODEL:   ",
             "settings_opt_sidebar" => "WORKSPACE FILE SIDEBAR:    ",
@@ -25,13 +29,17 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "settings_opt_clear" => "CLEAR ACTIVE CHAT HISTORY: ",
             "settings_clear_action" => " [ PRESS ENTER TO WIPE CONVERSATION ] ",
             "telemetry_title" => "   CYBERNETIC TELEMETRY STATISTICS:",
-            "telemetry_db" => "    ▸ SQLite Persistence Schema:  Active and Bound (~/.dsx/sessions.db)",
+            "telemetry_db" => {
+                "    ▸ SQLite Persistence Schema:  Active and Bound (~/.dsx/sessions.db)"
+            }
             "telemetry_cost" => "    ▸ Accumulated Session Cost:   ",
             "telemetry_tokens" => "    ▸ Total Counted Prompt Tokens: ",
             "diff_title" => " 🔍 ACTIVE WORKSPACE DIFFS ",
             "diff_banner" => "  DSX CODE INTERACTIVE WORKSPACE DIFF  ",
             "diff_header_desc" => "   Press [Ctrl+D] or [Esc] to exit the Diff Viewer.",
-            "diff_clean" => "   No modifications found in the active workspace. (Working tree clean)",
+            "diff_clean" => {
+                "   No modifications found in the active workspace. (Working tree clean)"
+            }
             "status_m_toggle" => "m:mode ",
             "status_tree_toggle" => "Ctrl+T:files ",
             "status_settings_toggle" => "Ctrl+S:settings ",
@@ -41,7 +49,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             _ => "",
         },
         Language::Russian => match key {
-            "welcome_msg" => "DSX Code — ИИ-агент для кодинга на базе DeepSeek V4.\nВведите задачу и нажмите Enter. Ctrl+C для выхода.",
+            "welcome_msg" => {
+                "DSX Code — ИИ-агент для кодинга на базе DeepSeek V4.\nВведите задачу и нажмите Enter. Ctrl+C для выхода."
+            }
             "sidebar_title" => " 📁 РАБОЧАЯ ОБЛАСТЬ ",
             "reasoning_title" => " 🧠 ХОД МЫСЛЕЙ ",
             "chat_title" => " 💻 КОГНИТИВНОЕ ЯДРО ",
@@ -52,7 +62,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "input_auth_title" => " 🔒 ШЛЮЗ БЕЗОПАСНОЙ АВТОРИЗАЦИИ ",
             "settings_title" => " ⚙️  СИСТЕМНЫЙ КОНФИГУРАТОР ",
             "settings_header_banner" => "  СИСТЕМНЫЙ КОНФИГУРАТОР DSX CODE  ",
-            "settings_header_desc" => "   Используйте стрелки [↑] / [↓] для навигации, [←] / [→] для изменения значений и [Esc] для возврата.",
+            "settings_header_desc" => {
+                "   Используйте стрелки [↑] / [↓] для навигации, [←] / [→] для изменения значений и [Esc] для возврата."
+            }
             "settings_opt_security" => "РЕЖИМ ЗАЩИТЫ БЕЗОПАСНОСТИ: ",
             "settings_opt_model" => "ОСНОВНАЯ МОДЕЛЬ ИИ:        ",
             "settings_opt_sidebar" => "БОКОВАЯ ПАНЕЛЬ ФАЙЛОВ:     ",
@@ -60,7 +72,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "settings_opt_clear" => "ОЧИСТИТЬ АКТИВНЫЙ ДИАЛОГ:  ",
             "settings_clear_action" => " [ НАЖМИТЕ ENTER ДЛЯ ОЧИСТКИ ЧАТА ] ",
             "telemetry_title" => "   СТАТИСТИКА КИБЕРНЕТИЧЕСКОЙ ТЕЛЕМЕТРИИ:",
-            "telemetry_db" => "    ▸ SQLite Схема Персистентности: Активна и привязана (~/.dsx/sessions.db)",
+            "telemetry_db" => {
+                "    ▸ SQLite Схема Персистентности: Активна и привязана (~/.dsx/sessions.db)"
+            }
             "telemetry_cost" => "    ▸ Накопленная стоимость сессии: ",
             "telemetry_tokens" => "    ▸ Общее число токенов запроса: ",
             "diff_title" => " 🔍 АКТИВНЫЕ ИЗМЕНЕНИЯ (DIFF) ",
@@ -76,7 +90,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             _ => "",
         },
         Language::Kazakh => match key {
-            "welcome_msg" => "DSX Code — DeepSeek V4 негізіндегі ИИ кодинг агенті.\nТапсырманы енгізіп, Enter басыңыз. Шығу үшін Ctrl+C басыңыз.",
+            "welcome_msg" => {
+                "DSX Code — DeepSeek V4 негізіндегі ИИ кодинг агенті.\nТапсырманы енгізіп, Enter басыңыз. Шығу үшін Ctrl+C басыңыз."
+            }
             "sidebar_title" => " 📁 ЖҰМЫС АЙМАҒЫ ",
             "reasoning_title" => " 🧠 ОЙЛАУ ПРОЦЕСІ ",
             "chat_title" => " 💻 КОГНИТИВТІК ЯДРО ",
@@ -87,7 +103,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "input_auth_title" => " 🔒 ҚАУІПСІЗДІК АВТОРИЗАЦИЯ ШЛҮЗІ ",
             "settings_title" => " ⚙️  ЖҮЙЕЛІК БАПТАУ КОРРЕКТОРЫ ",
             "settings_header_banner" => "  DSX CODE ЖҮЙЕ КОРРЕКТОРЫ  ",
-            "settings_header_desc" => "   Бағыттау үшін [↑] / [↓] бағыттауыштарын, өзгерту үшін [←] / [→], қайту үшін [Esc] басыңыз.",
+            "settings_header_desc" => {
+                "   Бағыттау үшін [↑] / [↓] бағыттауыштарын, өзгерту үшін [←] / [→], қайту үшін [Esc] басыңыз."
+            }
             "settings_opt_security" => "ҚАУІПСІЗДІК ҚОРҒАУ РЕЖИМІ:   ",
             "settings_opt_model" => "НЕГІЗГІ ИИ МОДЕЛІ:         ",
             "settings_opt_sidebar" => "ФАЙЛДАР БҮЙІРЛІК ПАНЕЛІ:   ",
@@ -111,7 +129,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             _ => "",
         },
         Language::Chinese => match key {
-            "welcome_msg" => "DSX Code — 基于 DeepSeek V4 的 AI 编程助手。\n输入任务并按 Enter 回车。按 Ctrl+C 退出。",
+            "welcome_msg" => {
+                "DSX Code — 基于 DeepSeek V4 的 AI 编程助手。\n输入任务并按 Enter 回车。按 Ctrl+C 退出。"
+            }
             "sidebar_title" => " 📁 工作区 ",
             "reasoning_title" => " 🧠 思维过程 ",
             "chat_title" => " 💻 认知核心 ",
@@ -122,7 +142,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "input_auth_title" => " 🔒 安全授权网关 ",
             "settings_title" => " ⚙️  系统设置配置器 ",
             "settings_header_banner" => "  DSX CODE 系统设置中心  ",
-            "settings_header_desc" => "   使用 [↑] / [↓] 方向键进行导航，[←] / [→] 修改设置参数，按 [Esc] 返回。",
+            "settings_header_desc" => {
+                "   使用 [↑] / [↓] 方向键进行导航，[←] / [→] 修改设置参数，按 [Esc] 返回。"
+            }
             "settings_opt_security" => "安全防护模式:              ",
             "settings_opt_model" => "核心推理模型:              ",
             "settings_opt_sidebar" => "工作区文件侧边栏:          ",
@@ -130,7 +152,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
             "settings_opt_clear" => "清空当前聊天历史记录:      ",
             "settings_clear_action" => " [ 按 ENTER 回车清空当前聊天 ] ",
             "telemetry_title" => "   系统运行指标监控数据:",
-            "telemetry_db" => "    ▸ SQLite 数据库持久化状态: 已激活并成功绑定 (~/.dsx/sessions.db)",
+            "telemetry_db" => {
+                "    ▸ SQLite 数据库持久化状态: 已激活并成功绑定 (~/.dsx/sessions.db)"
+            }
             "telemetry_cost" => "    ▸ 当前会话累计消耗金额:       ",
             "telemetry_tokens" => "    ▸ 已累计统计提示词 Token:     ",
             "diff_title" => " 🔍 活跃工作区差异对比 ",

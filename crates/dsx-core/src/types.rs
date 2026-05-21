@@ -31,7 +31,7 @@ pub enum PermissionMode {
 }
 
 impl PermissionMode {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "readonly" | "read-only" | "ro" => Some(Self::ReadOnly),
             "planonly" | "plan-only" | "plan" => Some(Self::PlanOnly),
@@ -63,12 +63,20 @@ impl PermissionMode {
     }
 
     pub fn all() -> &'static [Self] {
-        &[Self::ReadOnly, Self::PlanOnly, Self::Ask, Self::AutoApprove, Self::Yolo]
+        &[
+            Self::ReadOnly,
+            Self::PlanOnly,
+            Self::Ask,
+            Self::AutoApprove,
+            Self::Yolo,
+        ]
     }
 }
 
 /// Risk level for a command or edit
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum RiskLevel {
     Read,
     Low,

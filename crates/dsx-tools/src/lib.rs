@@ -1,7 +1,7 @@
 //! DSX Tools — tool definitions and registry for the agent loop.
 
-use serde::{Deserialize, Serialize};
 use dsx_core::types::RiskLevel;
+use serde::{Deserialize, Serialize};
 
 /// A tool that the agent can call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +67,20 @@ impl ToolRegistry {
                 risk: RiskLevel::Medium,
             },
             ToolSpec {
+                name: "write_file".into(),
+                description: "Create or overwrite a UTF-8 text file in the workspace. Creates parent directories when needed.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative file path"},
+                        "content": {"type": "string", "description": "Complete file contents to write"},
+                        "overwrite": {"type": "boolean", "description": "Allow overwriting an existing file. Defaults to false."}
+                    },
+                    "required": ["path", "content"]
+                }),
+                risk: RiskLevel::Medium,
+            },
+            ToolSpec {
                 name: "propose_patch".into(),
                 description: "Propose a code change as a SEARCH/REPLACE patch.".into(),
                 parameters: serde_json::json!({
@@ -84,6 +98,31 @@ impl ToolRegistry {
                         }}
                     },
                     "required": ["summary", "changes"]
+                }),
+                risk: RiskLevel::Medium,
+            },
+            ToolSpec {
+                name: "mcp_list_tools".into(),
+                description: "List tools exposed by configured MCP servers. Use before mcp_call to inspect names and input schemas.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {"type": "string", "description": "Optional configured MCP server name"}
+                    }
+                }),
+                risk: RiskLevel::Read,
+            },
+            ToolSpec {
+                name: "mcp_call".into(),
+                description: "Call a tool on a configured MCP server with a JSON object of arguments.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {"type": "string", "description": "Configured MCP server name"},
+                        "tool": {"type": "string", "description": "Tool name exposed by the MCP server"},
+                        "arguments": {"type": "object", "description": "Tool arguments matching the MCP input schema"}
+                    },
+                    "required": ["server", "tool", "arguments"]
                 }),
                 risk: RiskLevel::Medium,
             },

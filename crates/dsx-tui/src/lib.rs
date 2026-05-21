@@ -1,11 +1,11 @@
 //! DSX TUI — ratatui-based interactive terminal workspace.
 
-pub mod types;
-pub mod i18n;
 pub mod draw;
 pub mod draw_settings;
+pub mod i18n;
+pub mod types;
 
-pub use types::{Language, ChatMessage, AgentTask, AgentStreamEvent, PendingApproval};
+pub use types::{AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval};
 
 /// Shared app state.
 pub struct App {
@@ -35,10 +35,18 @@ impl App {
     pub fn new() -> Self {
         let initial_lang = Language::English;
         let initial_msg = match initial_lang {
-            Language::Russian => "DSX Code — ИИ-агент для кодинга на базе DeepSeek V4.\nВведите задачу и нажмите Enter. Ctrl+C для выхода.",
-            Language::Kazakh => "DSX Code — DeepSeek V4 негізіндегі ИИ кодинг агенті.\nТапсырманы енгізіп, Enter басыңыз. Шығу үшін Ctrl+C басыңыз.",
-            Language::Chinese => "DSX Code — 基于 DeepSeek V4 的 AI 编程助手。\n输入任务并按 Enter 回车。按 Ctrl+C 退出。",
-            Language::English => "DSX Code — DeepSeek V4 coding agent.\nType a task and press Enter. Ctrl+C to quit.",
+            Language::Russian => {
+                "DSX Code — ИИ-агент для кодинга на базе DeepSeek V4.\nВведите задачу и нажмите Enter. Ctrl+C для выхода."
+            }
+            Language::Kazakh => {
+                "DSX Code — DeepSeek V4 негізіндегі ИИ кодинг агенті.\nТапсырманы енгізіп, Enter басыңыз. Шығу үшін Ctrl+C басыңыз."
+            }
+            Language::Chinese => {
+                "DSX Code — 基于 DeepSeek V4 的 AI 编程助手。\n输入任务并按 Enter 回车。按 Ctrl+C 退出。"
+            }
+            Language::English => {
+                "DSX Code — DeepSeek V4 coding agent.\nType a task and press Enter. Ctrl+C to quit."
+            }
         };
 
         Self {
@@ -85,29 +93,37 @@ impl App {
                     self.current_reasoning.clear();
                 }
                 // Append to the last assistant message, or create one
-                if let Some(last) = self.messages.last_mut() {
-                    if last.role == "assistant" {
-                        last.content.push_str(token);
-                        return;
-                    }
+                if let Some(last) = self.messages.last_mut()
+                    && last.role == "assistant"
+                {
+                    last.content.push_str(token);
+                    return;
                 }
                 self.messages.push(ChatMessage {
                     role: "assistant".into(),
                     content: token.clone(),
                 });
             }
-            AgentStreamEvent::ToolResult { name, success, summary } => {
+            AgentStreamEvent::ToolResult {
+                name,
+                success,
+                summary,
+            } => {
                 let status = if *success { "✓" } else { "✗" };
                 let short: String = summary.chars().take(150).collect();
                 self.add_message("tool", &format!("{status} {name} — {short}"));
             }
-            AgentStreamEvent::Done { answer: _ans, iterations, tokens, cost } => {
+            AgentStreamEvent::Done {
+                answer: _ans,
+                iterations,
+                tokens,
+                cost,
+            } => {
                 self.tokens += tokens;
                 self.cost += cost;
                 self.current_reasoning.clear();
-                self.agent_task = AgentTask::Done(
-                    format!("{} iterations, ${:.4}", iterations, cost)
-                );
+                self.agent_task =
+                    AgentTask::Done(format!("{} iterations, ${:.4}", iterations, cost));
             }
             AgentStreamEvent::Error(err) => {
                 self.add_message("error", err);
@@ -122,5 +138,11 @@ impl App {
             role: role.into(),
             content: content.into(),
         });
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
     }
 }

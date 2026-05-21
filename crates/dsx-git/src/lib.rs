@@ -1,14 +1,11 @@
 //! DSX Git — thin wrapper around git CLI for status, diff, checkpoints.
 
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
 
 /// Run a git command in the given directory.
 fn git(args: &[&str], cwd: &Path) -> anyhow::Result<String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()?;
+    let output = Command::new("git").args(args).current_dir(cwd).output()?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
@@ -37,12 +34,15 @@ pub fn checkpoint(label: &str, cwd: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Discard the head commit if it is a DSX checkpoint, rolling back all workspace files.
+/// Restore the working tree to the latest DSX checkpoint.
 pub fn rollback(cwd: &Path) -> anyhow::Result<String> {
     let last_msg = git(&["log", "-1", "--pretty=%B"], cwd)?;
     if last_msg.trim().starts_with("DSX checkpoint:") {
-        git(&["reset", "--hard", "HEAD~1"], cwd)?;
-        Ok(format!("Successfully rolled back: {}", last_msg.trim()))
+        git(&["reset", "--hard", "HEAD"], cwd)?;
+        Ok(format!(
+            "Successfully restored checkpoint: {}",
+            last_msg.trim()
+        ))
     } else {
         anyhow::bail!("No active DSX checkpoint found at HEAD. Cannot undo.")
     }
@@ -71,28 +71,37 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
 
         // Init git repo
-        let _ = Command::new("git").args(["init", "-q"]).current_dir(&tmp).output();
-        let _ = Command::new("git").args(["config", "user.name", "test"]).current_dir(&tmp).output();
-        let _ = Command::new("git").args(["config", "user.email", "test@test.com"]).current_dir(&tmp).output();
+        let _ = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&tmp)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.name", "test"])
+            .current_dir(&tmp)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&tmp)
+            .output();
 
         // Initial commit
         std::fs::write(tmp.join("a.txt"), "initial").unwrap();
         git(&["add", "-A"], &tmp).unwrap();
         git(&["commit", "-m", "initial commit"], &tmp).unwrap();
 
-        // Mod and checkpoint
-        std::fs::write(tmp.join("a.txt"), "modified").unwrap();
+        // User dirty state and checkpoint
+        std::fs::write(tmp.join("a.txt"), "user changes").unwrap();
         checkpoint("edit-1", &tmp).unwrap();
 
-        let mid = std::fs::read_to_string(tmp.join("a.txt")).unwrap();
-        assert_eq!(mid, "modified");
+        // Simulate agent edit after checkpoint.
+        std::fs::write(tmp.join("a.txt"), "agent changes").unwrap();
 
         // Rollback
         let res = rollback(&tmp).unwrap();
         assert!(res.contains("edit-1"));
 
         let final_content = std::fs::read_to_string(tmp.join("a.txt")).unwrap();
-        assert_eq!(final_content, "initial");
+        assert_eq!(final_content, "user changes");
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

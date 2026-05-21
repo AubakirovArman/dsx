@@ -621,6 +621,7 @@ dependencies = [
  "dsx-core",
  "dsx-fs",
  "dsx-git",
+ "dsx-mcp",
  "dsx-patch",
  "dsx-permissions",
  "dsx-prompts",
@@ -674,9 +675,12 @@ name = "dsx-eval"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dsx-agent",
  "dsx-core",
+ "dsx-sandbox",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -699,6 +703,7 @@ name = "dsx-index"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dsx-memory",
  "ignore",
  "serde",
  "sqlx",
@@ -711,6 +716,7 @@ name = "dsx-mcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dirs",
  "serde",
  "serde_json",
  "tokio",

@@ -2,7 +2,7 @@
 
 use std::process::Stdio;
 use tokio::process::Command;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 pub struct RunResult {
     pub exit_code: Option<i32>,

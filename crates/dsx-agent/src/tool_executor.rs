@@ -1,9 +1,9 @@
 //! DSX Tool Executor — orchestrate the safe and authorized execution of tools.
 
-use dsx_core::types::{PermissionMode, RiskLevel};
-use dsx_permissions::{classify_command, required_action, PermissionAction};
-use dsx_provider::streaming::ToolCallReady;
 use crate::types::ToolResult;
+use dsx_core::types::{PermissionMode, RiskLevel};
+use dsx_permissions::{PermissionAction, classify_command, required_action};
+use dsx_provider::streaming::ToolCallReady;
 
 /// Context for tool execution.
 pub struct ToolContext {
@@ -60,41 +60,50 @@ pub async fn execute(call: &ToolCallReady, ctx: &ToolContext) -> ToolResult {
     }
 
     if matches!(action, PermissionAction::Ask) {
-        if let Some(ref approval_tx) = ctx.approval_tx {
-            let (tx_reply, rx_reply) = tokio::sync::oneshot::channel();
-            let req = super::ApprovalRequest {
-                tool_name: call.name.clone(),
-                arguments: call.arguments.clone(),
-                tx: tx_reply,
+        let Some(ref approval_tx) = ctx.approval_tx else {
+            return ToolResult {
+                tool_call_id: call.id.clone(),
+                name: call.name.clone(),
+                content: format!(
+                    "Permission requires interactive approval for '{}' (risk level {:?}), but no approval channel is available. Re-run in TUI or use an explicit non-interactive mode.",
+                    call.name, final_risk
+                ),
+                success: false,
+                risk: final_risk,
+                denied: true,
             };
+        };
 
-            if approval_tx.send(req).is_ok() {
-                // Wait for the user's decision from the TUI!
-                match rx_reply.await {
-                    Ok(true) => {
-                        // User approved! Continue execution.
-                    }
-                    _ => {
-                        return ToolResult {
-                            tool_call_id: call.id.clone(),
-                            name: call.name.clone(),
-                            content: "Tool execution denied by user.".into(),
-                            success: false,
-                            risk: final_risk,
-                            denied: true,
-                        };
-                    }
+        let (tx_reply, rx_reply) = tokio::sync::oneshot::channel();
+        let req = super::ApprovalRequest {
+            tool_name: call.name.clone(),
+            arguments: call.arguments.clone(),
+            tx: tx_reply,
+        };
+
+        if approval_tx.send(req).is_ok() {
+            match rx_reply.await {
+                Ok(true) => {}
+                _ => {
+                    return ToolResult {
+                        tool_call_id: call.id.clone(),
+                        name: call.name.clone(),
+                        content: "Tool execution denied by user.".into(),
+                        success: false,
+                        risk: final_risk,
+                        denied: true,
+                    };
                 }
-            } else {
-                return ToolResult {
-                    tool_call_id: call.id.clone(),
-                    name: call.name.clone(),
-                    content: "Approval channel closed, tool denied.".into(),
-                    success: false,
-                    risk: final_risk,
-                    denied: true,
-                };
             }
+        } else {
+            return ToolResult {
+                tool_call_id: call.id.clone(),
+                name: call.name.clone(),
+                content: "Approval channel closed, tool denied.".into(),
+                success: false,
+                risk: final_risk,
+                denied: true,
+            };
         }
     }
 
@@ -110,8 +119,13 @@ pub async fn execute(call: &ToolCallReady, ctx: &ToolContext) -> ToolResult {
         "read_file" => crate::tool_implementations::exec_read_file(&call.id, &args, ctx),
         "list_files" => crate::tool_implementations::exec_list_files(&call.id, &args, ctx),
         "grep" => crate::tool_implementations::exec_grep(&call.id, &args, ctx),
+        "write_file" => crate::tool_implementations::exec_write_file(&call.id, &args, ctx),
         "propose_patch" => crate::tool_implementations::exec_propose_patch(&call.id, &args, ctx),
-        "run_command" => crate::tool_implementations::exec_run_command(&call.id, &args, ctx),
+        "mcp_list_tools" => {
+            crate::tool_implementations::exec_mcp_list_tools(&call.id, &args, ctx).await
+        }
+        "mcp_call" => crate::tool_implementations::exec_mcp_call(&call.id, &args, ctx).await,
+        "run_command" => crate::tool_implementations::exec_run_command(&call.id, &args, ctx).await,
         name => ToolResult {
             tool_call_id: call.id.clone(),
             name: name.into(),
@@ -126,8 +140,8 @@ pub async fn execute(call: &ToolCallReady, ctx: &ToolContext) -> ToolResult {
 /// Map tool name to risk level.
 pub fn tool_risk(name: &str) -> RiskLevel {
     match name {
-        "read_file" | "list_files" | "grep" => RiskLevel::Read,
-        "propose_patch" => RiskLevel::Medium,
+        "read_file" | "list_files" | "grep" | "mcp_list_tools" => RiskLevel::Read,
+        "write_file" | "propose_patch" | "mcp_call" => RiskLevel::Medium,
         "run_command" => RiskLevel::Medium, // re-classified by command content
         _ => RiskLevel::Medium,
     }

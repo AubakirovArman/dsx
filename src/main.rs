@@ -4,26 +4,47 @@ pub mod cli;
 pub mod handlers;
 
 use clap::Parser;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use tokio::sync::mpsc;
 
-use cli::{CliArgs, Command, WorkspaceAction};
-use handlers::{run_plan, run_edit, list_sessions};
+use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
+use handlers::{
+    list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
+    run_mcp_list, run_plan,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = CliArgs::parse();
 
     let project_root = std::fs::canonicalize(&cli.workspace).unwrap_or(cli.workspace);
+    let app_config = match dsx_config::load_for_project(&project_root) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Warning: failed to load config: {e}");
+            dsx_config::AppConfig::default()
+        }
+    };
 
-    let mode = dsx_core::types::PermissionMode::from_str(&cli.mode)
+    let mode_name = cli
+        .mode
+        .as_deref()
+        .unwrap_or(app_config.app.default_mode.as_str());
+    let mode = dsx_core::types::PermissionMode::parse(mode_name)
         .unwrap_or(dsx_core::types::PermissionMode::Ask);
 
-    let api_key = cli.api_key.clone().or_else(|| std::env::var("DEEPSEEK_API_KEY").ok());
-    let api_base = cli.api_base.clone().unwrap_or_else(|| "https://api.deepseek.com".to_string());
+    let api_key = cli
+        .api_key
+        .clone()
+        .or_else(|| std::env::var(&app_config.provider.api_key_env).ok())
+        .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok());
+    let api_base = cli
+        .api_base
+        .clone()
+        .unwrap_or_else(|| app_config.provider.openai_base_url.clone());
 
     match cli.command {
         None | Some(Command::Interactive) => {
@@ -33,7 +54,10 @@ async fn main() -> anyhow::Result<()> {
             let (pool, sid) = match dsx_memory::open(&db_path).await {
                 Ok(pool) => {
                     let sm = dsx_session::SessionManager::new(pool.clone());
-                    match sm.create(&project_root.display().to_string(), mode.as_str()).await {
+                    match sm
+                        .create(&project_root.display().to_string(), mode.as_str())
+                        .await
+                    {
                         Ok(s) => (Some(pool), Some(s.id)),
                         Err(_) => (Some(pool), None),
                     }
@@ -69,6 +93,36 @@ async fn main() -> anyhow::Result<()> {
             run_edit(project_root, key, api_base, &desc, mode).await?;
         }
 
+        Some(Command::Eval {
+            tasks_file,
+            no_agent,
+        }) => {
+            run_eval(project_root, api_key, api_base, tasks_file, mode, no_agent).await?;
+        }
+
+        Some(Command::Index { action }) => match action {
+            IndexAction::Build => {
+                run_index_build(&project_root).await?;
+            }
+            IndexAction::Search { query, limit } => {
+                run_index_search(&project_root, &query, limit).await?;
+            }
+        },
+
+        Some(Command::Mcp { action }) => match action {
+            McpAction::List { command, args } => {
+                run_mcp_list(&command, &args).await?;
+            }
+            McpAction::Call {
+                tool,
+                arguments_json,
+                command,
+                args,
+            } => {
+                run_mcp_call(&command, &args, &tool, &arguments_json).await?;
+            }
+        },
+
         Some(Command::Workspace { action }) => match action {
             None | Some(WorkspaceAction::List) => {
                 list_sessions(&project_root).await;
@@ -87,10 +141,18 @@ async fn main() -> anyhow::Result<()> {
                         let sm = dsx_session::SessionManager::new(pool.clone());
                         match sm.get(&id).await {
                             Ok(Some(s)) => {
-                                let session_mode = dsx_core::types::PermissionMode::from_str(&s.mode)
-                                    .unwrap_or(mode);
+                                let session_mode =
+                                    dsx_core::types::PermissionMode::parse(&s.mode).unwrap_or(mode);
                                 println!("Resuming session {}...", s.id);
-                                run_tui(project_root, key, api_base, session_mode, Some(s.id), Some(pool)).await?;
+                                run_tui(
+                                    project_root,
+                                    key,
+                                    api_base,
+                                    session_mode,
+                                    Some(s.id),
+                                    Some(pool),
+                                )
+                                .await?;
                             }
                             _ => {
                                 println!("Error: Session with ID '{}' not found.", id);
@@ -118,10 +180,7 @@ async fn run_tui(
     session_id: Option<String>,
     pool: Option<sqlx::SqlitePool>,
 ) -> anyhow::Result<()> {
-    use ratatui::{
-        backend::CrosstermBackend,
-        Terminal,
-    };
+    use ratatui::{Terminal, backend::CrosstermBackend};
 
     let rt = tokio::runtime::Handle::current();
 
@@ -132,7 +191,13 @@ async fn run_tui(
     let mut terminal = Terminal::new(backend)?;
 
     let app = Arc::new(Mutex::new(dsx_tui::App::new()));
-    
+    let history_events = if let (Some(sid), Some(p)) = (session_id.clone(), pool.clone()) {
+        let sm = dsx_session::SessionManager::new(p);
+        sm.get_events(&sid).await.ok().map(|events| (sid, events))
+    } else {
+        None
+    };
+
     // Set custom API base URL dynamically
     {
         let mut a = app.lock().unwrap();
@@ -144,31 +209,41 @@ async fn run_tui(
         let mut a = app.lock().unwrap();
         a.mode = initial_mode.as_str().to_string();
         a.add_message("system", &format!("Project: {}", project_root.display()));
-        a.add_message("system", &format!("Mode: {} — {}", initial_mode.as_str(), initial_mode.description()));
-        
+        a.add_message(
+            "system",
+            &format!(
+                "Mode: {} — {}",
+                initial_mode.as_str(),
+                initial_mode.description()
+            ),
+        );
+
         // Load history if pool and session_id are provided
-        if let (Some(sid), Some(p)) = (session_id.clone(), pool.clone()) {
+        if let Some((sid, events)) = history_events {
             a.add_message("system", &format!("Session ID: {}", sid));
-            let sm = dsx_session::SessionManager::new(p.clone());
-            if let Ok(events) = sm.get_events(&sid).await {
-                if !events.is_empty() {
-                    a.add_message("system", &format!("✓ Loaded {} historical message events from SQLite.", events.len()));
-                    for e in events {
-                        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&e.data_json) {
-                            if e.type_ == "user_msg" {
-                                if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
-                                    a.add_message("user", content);
-                                }
-                            } else if e.type_ == "assistant_msg" {
-                                if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
-                                    a.add_message("assistant", content);
-                                }
-                                if let Some(cost) = data.get("cost").and_then(|v| v.as_f64()) {
-                                    a.cost = cost;
-                                }
-                                if let Some(tokens) = data.get("tokens").and_then(|v| v.as_u64()) {
-                                    a.tokens = tokens;
-                                }
+            if !events.is_empty() {
+                a.add_message(
+                    "system",
+                    &format!(
+                        "✓ Loaded {} historical message events from SQLite.",
+                        events.len()
+                    ),
+                );
+                for e in events {
+                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&e.data_json) {
+                        if e.type_ == "user_msg" {
+                            if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
+                                a.add_message("user", content);
+                            }
+                        } else if e.type_ == "assistant_msg" {
+                            if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
+                                a.add_message("assistant", content);
+                            }
+                            if let Some(cost) = data.get("cost").and_then(|v| v.as_f64()) {
+                                a.cost = cost;
+                            }
+                            if let Some(tokens) = data.get("tokens").and_then(|v| v.as_u64()) {
+                                a.tokens = tokens;
                             }
                         }
                     }
@@ -237,7 +312,10 @@ async fn run_tui(
                             let mut a = app.lock().unwrap();
                             if let Some(approval) = a.pending_approval.take() {
                                 let _ = approval.tx.send(true);
-                                a.add_message("system", "🔐 Authorization: APPROVED (tool executing...)");
+                                a.add_message(
+                                    "system",
+                                    "🔐 Authorization: APPROVED (tool executing...)",
+                                );
                             }
                             continue;
                         }
@@ -249,7 +327,11 @@ async fn run_tui(
                             }
                             continue;
                         }
-                        KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('c')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             break;
                         }
                         _ => {
@@ -271,12 +353,20 @@ async fn run_tui(
                             a.show_diff = false;
                             continue;
                         }
-                        KeyCode::Char('d') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('d')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             let mut a = app.lock().unwrap();
                             a.show_diff = false;
                             continue;
                         }
-                        KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('c')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             break;
                         }
                         _ => {
@@ -298,7 +388,11 @@ async fn run_tui(
                             a.show_settings = false;
                             continue;
                         }
-                        KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('s')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             let mut a = app.lock().unwrap();
                             a.show_settings = false;
                             continue;
@@ -318,11 +412,15 @@ async fn run_tui(
                             match a.settings_cursor {
                                 0 => {
                                     // Toggle Protection Mode
-                                    let current = dsx_core::types::PermissionMode::from_str(&a.mode)
+                                    let current = dsx_core::types::PermissionMode::parse(&a.mode)
                                         .unwrap_or(dsx_core::types::PermissionMode::Ask);
                                     let all = dsx_core::types::PermissionMode::all();
                                     let idx = all.iter().position(|x| *x == current).unwrap_or(2);
-                                    let offset = if matches!(key.code, KeyCode::Left) { all.len() - 1 } else { 1 };
+                                    let offset = if matches!(key.code, KeyCode::Left) {
+                                        all.len() - 1
+                                    } else {
+                                        1
+                                    };
                                     let next = all[(idx + offset) % all.len()];
                                     a.mode = next.as_str().to_string();
                                 }
@@ -342,47 +440,80 @@ async fn run_tui(
                                     // Toggle interface language (i18n)
                                     let all = dsx_tui::Language::all();
                                     let idx = all.iter().position(|x| *x == a.lang).unwrap_or(0);
-                                    let offset = if matches!(key.code, KeyCode::Left) { all.len() - 1 } else { 1 };
+                                    let offset = if matches!(key.code, KeyCode::Left) {
+                                        all.len() - 1
+                                    } else {
+                                        1
+                                    };
                                     let next = all[(idx + offset) % all.len()];
                                     a.lang = next;
-                                    
+
                                     // Localize the change log message
                                     let change_log = match next {
-                                        dsx_tui::Language::Russian => "Язык интерфейса изменен на Русский.",
-                                        dsx_tui::Language::Kazakh => "Интерфейс тілі Қазақша болып өзгертілді.",
-                                        dsx_tui::Language::Chinese => "界面显示语言已成功切换为 中文。",
-                                        dsx_tui::Language::English => "Interface language successfully changed to English.",
+                                        dsx_tui::Language::Russian => {
+                                            "Язык интерфейса изменен на Русский."
+                                        }
+                                        dsx_tui::Language::Kazakh => {
+                                            "Интерфейс тілі Қазақша болып өзгертілді."
+                                        }
+                                        dsx_tui::Language::Chinese => {
+                                            "界面显示语言已成功切换为 中文。"
+                                        }
+                                        dsx_tui::Language::English => {
+                                            "Interface language successfully changed to English."
+                                        }
                                     };
                                     a.add_message("system", change_log);
                                 }
                                 4 => {
                                     // Toggle API Base URL
-                                    let presets = vec![
+                                    let presets = [
                                         "https://api.deepseek.com",
                                         "http://localhost:11434/v1",
                                         "http://localhost:8000/v1",
                                         "https://api.openai.com/v1",
                                     ];
-                                    let idx = presets.iter().position(|x| *x == a.api_base).unwrap_or(0);
-                                    let offset = if matches!(key.code, KeyCode::Left) { presets.len() - 1 } else { 1 };
+                                    let idx =
+                                        presets.iter().position(|x| *x == a.api_base).unwrap_or(0);
+                                    let offset = if matches!(key.code, KeyCode::Left) {
+                                        presets.len() - 1
+                                    } else {
+                                        1
+                                    };
                                     let next = presets[(idx + offset) % presets.len()];
                                     a.api_base = next.to_string();
-                                    
+
                                     let change_log = match a.lang {
-                                        dsx_tui::Language::Russian => format!("Адрес API Endpoint изменен на: {}", next),
-                                        dsx_tui::Language::Kazakh => format!("API Endpoint мекені ауыстырылды: {}", next),
-                                        dsx_tui::Language::Chinese => format!("API 服务基准地址已切换为: {}", next),
-                                        dsx_tui::Language::English => format!("API Endpoint base changed to: {}", next),
+                                        dsx_tui::Language::Russian => {
+                                            format!("Адрес API Endpoint изменен на: {}", next)
+                                        }
+                                        dsx_tui::Language::Kazakh => {
+                                            format!("API Endpoint мекені ауыстырылды: {}", next)
+                                        }
+                                        dsx_tui::Language::Chinese => {
+                                            format!("API 服务基准地址已切换为: {}", next)
+                                        }
+                                        dsx_tui::Language::English => {
+                                            format!("API Endpoint base changed to: {}", next)
+                                        }
                                     };
                                     a.add_message("system", &change_log);
                                 }
                                 5 => {
                                     // API Key informative notice
                                     let msg = match a.lang {
-                                        dsx_tui::Language::Russian => "🔑 Системный лог: Ключ авторизации API Key надежно загружен из системного окружения.",
-                                        dsx_tui::Language::Kazakh => "🔑 Жүйелік журнал: API авторизация кілті жүйелік ортадан қауіпсіз түрде жүктелді.",
-                                        dsx_tui::Language::Chinese => "🔑 系统日志: API 授权密钥已从系统环境安全变量中加载完毕。",
-                                        dsx_tui::Language::English => "🔑 System Log: API Key is securely loaded from system environmental variables.",
+                                        dsx_tui::Language::Russian => {
+                                            "🔑 Системный лог: Ключ авторизации API Key надежно загружен из системного окружения."
+                                        }
+                                        dsx_tui::Language::Kazakh => {
+                                            "🔑 Жүйелік журнал: API авторизация кілті жүйелік ортадан қауіпсіз түрде жүктелді."
+                                        }
+                                        dsx_tui::Language::Chinese => {
+                                            "🔑 系统日志: API 授权密钥已从系统环境安全变量中加载完毕。"
+                                        }
+                                        dsx_tui::Language::English => {
+                                            "🔑 System Log: API Key is securely loaded from system environmental variables."
+                                        }
                                     };
                                     a.add_message("system", msg);
                                 }
@@ -395,16 +526,28 @@ async fn run_tui(
                             if a.settings_cursor == 6 {
                                 a.messages.clear();
                                 let clear_msg = match a.lang {
-                                    dsx_tui::Language::Russian => "🧹 Системный лог: Когнитивная история чата очищена.",
-                                    dsx_tui::Language::Kazakh => "🧹 Жүйелік журнал: Чат тарихы толығымен тазартылды.",
-                                    dsx_tui::Language::Chinese => "🧹 系统日志: 当前会话聊天历史记录已成功清除。",
-                                    dsx_tui::Language::English => "🧹 System Log: Conversational core history wiped.",
+                                    dsx_tui::Language::Russian => {
+                                        "🧹 Системный лог: Когнитивная история чата очищена."
+                                    }
+                                    dsx_tui::Language::Kazakh => {
+                                        "🧹 Жүйелік журнал: Чат тарихы толығымен тазартылды."
+                                    }
+                                    dsx_tui::Language::Chinese => {
+                                        "🧹 系统日志: 当前会话聊天历史记录已成功清除。"
+                                    }
+                                    dsx_tui::Language::English => {
+                                        "🧹 System Log: Conversational core history wiped."
+                                    }
                                 };
                                 a.add_message("system", clear_msg);
                             }
                             continue;
                         }
-                        KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('c')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             break;
                         }
                         _ => {
@@ -414,7 +557,11 @@ async fn run_tui(
                 }
 
                 match key.code {
-                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('c')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
                         break;
                     }
                     KeyCode::Enter => {
@@ -430,7 +577,7 @@ async fn run_tui(
                             if task.trim().is_empty() {
                                 continue;
                             }
-                            current_mode = dsx_core::types::PermissionMode::from_str(&a.mode)
+                            current_mode = dsx_core::types::PermissionMode::parse(&a.mode)
                                 .unwrap_or(dsx_core::types::PermissionMode::Ask);
                             a.add_message("user", &task);
                             a.agent_task = dsx_tui::AgentTask::Running(task.clone());
@@ -444,7 +591,13 @@ async fn run_tui(
                             let sid_copy = sid.clone();
                             let task_copy = task.clone();
                             rt.spawn(async move {
-                                let _ = sm.record_event(&sid_copy, "user_msg", &serde_json::json!({ "content": task_copy })).await;
+                                let _ = sm
+                                    .record_event(
+                                        &sid_copy,
+                                        "user_msg",
+                                        &serde_json::json!({ "content": task_copy }),
+                                    )
+                                    .await;
                             });
                         }
 
@@ -501,32 +654,52 @@ async fn run_tui(
                             // Persist assistant message to SQLite
                             if let Some(last_msg) = a.messages.last() {
                                 if last_msg.role == "assistant" {
-                                    if let (Some(sid), Some(p)) = (session_id_opt.clone(), pool_opt.clone()) {
+                                    if let (Some(sid), Some(p)) =
+                                        (session_id_opt.clone(), pool_opt.clone())
+                                    {
                                         let sm = dsx_session::SessionManager::new(p);
                                         let content = last_msg.content.clone();
                                         let cost = a.cost;
                                         let tokens = a.tokens;
                                         rt_copy.spawn(async move {
-                                            let _ = sm.record_event(&sid, "assistant_msg", &serde_json::json!({
-                                                "content": content,
-                                                "cost": cost,
-                                                "tokens": tokens,
-                                            })).await;
+                                            let _ = sm
+                                                .record_event(
+                                                    &sid,
+                                                    "assistant_msg",
+                                                    &serde_json::json!({
+                                                        "content": content,
+                                                        "cost": cost,
+                                                        "tokens": tokens,
+                                                    }),
+                                                )
+                                                .await;
                                         });
                                     }
                                 }
                             }
                         });
                     }
-                    KeyCode::Char('t') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('t')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
                         let mut a = app.lock().unwrap();
                         a.show_file_tree = !a.show_file_tree;
                     }
-                    KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('s')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
                         let mut a = app.lock().unwrap();
                         a.show_settings = !a.show_settings;
                     }
-                    KeyCode::Char('d') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('d')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
                         let mut a = app.lock().unwrap();
                         if !a.show_diff {
                             if let Ok(d) = dsx_git::diff(&project_root) {
@@ -537,7 +710,11 @@ async fn run_tui(
                         }
                         a.show_diff = !a.show_diff;
                     }
-                    KeyCode::Char('u') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('u')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
                         let mut a = app.lock().unwrap();
                         match dsx_git::rollback(&project_root) {
                             Ok(msg) => {
@@ -613,21 +790,33 @@ fn convert_event(ev: &dsx_provider::streaming::StreamEvent) -> dsx_tui::AgentStr
             dsx_tui::AgentStreamEvent::ToolResult {
                 name: tc.name.clone(),
                 success: true,
-                summary: format!("{}", tc.name),
+                summary: format!("requested {}", tc.name),
             }
         }
+        dsx_provider::streaming::StreamEvent::ToolResult {
+            name,
+            success,
+            summary,
+        } => dsx_tui::AgentStreamEvent::ToolResult {
+            name: name.clone(),
+            success: *success,
+            summary: summary.clone(),
+        },
         dsx_provider::streaming::StreamEvent::Finish { .. } => {
             // Finish is handled by Done event separately
             dsx_tui::AgentStreamEvent::Reasoning(String::new())
         }
-        dsx_provider::streaming::StreamEvent::Done { answer, iterations, tokens, cost } => {
-            dsx_tui::AgentStreamEvent::Done {
-                answer: answer.clone(),
-                iterations: *iterations,
-                tokens: *tokens,
-                cost: *cost,
-            }
-        }
+        dsx_provider::streaming::StreamEvent::Done {
+            answer,
+            iterations,
+            tokens,
+            cost,
+        } => dsx_tui::AgentStreamEvent::Done {
+            answer: answer.clone(),
+            iterations: *iterations,
+            tokens: *tokens,
+            cost: *cost,
+        },
         dsx_provider::streaming::StreamEvent::Error(err) => {
             dsx_tui::AgentStreamEvent::Error(err.clone())
         }

@@ -80,6 +80,12 @@ pub enum StreamEvent {
     Content(String),
     /// A complete tool call is ready (accumulated from deltas).
     ToolCall(ToolCallReady),
+    /// A tool call completed locally.
+    ToolResult {
+        name: String,
+        success: bool,
+        summary: String,
+    },
     /// Stream ended with a finish reason and usage.
     Finish {
         finish_reason: String,
@@ -135,18 +141,17 @@ impl ToolAccumulator {
                 }
             }
             // A tool call is ready when we have id, name, and arguments are valid JSON
-            if let Some(ref id) = parts.id {
-                if let Some(ref name) = parts.name {
-                    if is_complete_json(&parts.arguments) {
-                        let tc = ToolCallReady {
-                            id: id.clone(),
-                            name: name.clone(),
-                            arguments: parts.arguments.clone(),
-                        };
-                        ready.push(tc);
-                        self.pending.remove(&delta.index);
-                    }
-                }
+            if let Some(ref id) = parts.id
+                && let Some(ref name) = parts.name
+                && is_complete_json(&parts.arguments)
+            {
+                let tc = ToolCallReady {
+                    id: id.clone(),
+                    name: name.clone(),
+                    arguments: parts.arguments.clone(),
+                };
+                ready.push(tc);
+                self.pending.remove(&delta.index);
             }
         }
         ready
@@ -165,9 +170,7 @@ fn is_complete_json(s: &str) -> bool {
 // ── SSE line parser ─────────────────────────────────────────────────
 
 /// Parse an SSE response body into a stream of `StreamEvent`s.
-pub async fn parse_sse_stream(
-    response: reqwest::Response,
-) -> anyhow::Result<Vec<StreamEvent>> {
+pub async fn parse_sse_stream(response: reqwest::Response) -> anyhow::Result<Vec<StreamEvent>> {
     let mut events = Vec::new();
     let mut acc = ToolAccumulator::default();
     let mut bytes = response.bytes_stream();

@@ -30,17 +30,22 @@ impl ContextManager {
         let git_status = dsx_git::status(project_root).unwrap_or_default();
         let git_diff = dsx_git::diff(project_root).unwrap_or_default();
         let file_tree = dsx_fs::list_files(project_root)?;
-
-        // TODO: load memories from memory store
+        let memories = load_memories(project_root).await.unwrap_or_default();
 
         Ok(AgentContext {
             project_root: project_root.display().to_string(),
             git_status,
             git_diff,
             file_tree,
-            memories: Vec::new(),
+            memories,
             max_tokens,
         })
+    }
+}
+
+impl Default for ContextManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -53,10 +58,10 @@ pub fn load_project_instructions(root: &Path) -> Option<String> {
         root.join("AGENTS.md"),
     ];
     for path in &candidates {
-        if path.exists() {
-            if let Ok(content) = std::fs::read_to_string(path) {
-                return Some(content);
-            }
+        if path.exists()
+            && let Ok(content) = std::fs::read_to_string(path)
+        {
+            return Some(content);
         }
     }
     None
@@ -74,5 +79,31 @@ pub fn format_context(ctx: &AgentContext) -> String {
     for f in &ctx.file_tree {
         buf.push_str(&format!("  {f}\n"));
     }
+    if !ctx.memories.is_empty() {
+        buf.push_str("Memories:\n");
+        for memory in &ctx.memories {
+            buf.push_str(&format!("  {memory}\n"));
+        }
+    }
     buf
+}
+
+async fn load_memories(project_root: &Path) -> anyhow::Result<Vec<String>> {
+    let db_path = project_root.join(".dsx").join("sessions.db");
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let pool = dsx_memory::open(&db_path).await?;
+    let project_root_str = project_root.display().to_string();
+    let items = dsx_memory::recent_memory_items(&pool, &project_root_str, 20).await?;
+    Ok(items
+        .into_iter()
+        .map(|item| {
+            format!(
+                "[{}:{} conf={:.2}] {}",
+                item.scope, item.type_, item.confidence, item.content
+            )
+        })
+        .collect())
 }

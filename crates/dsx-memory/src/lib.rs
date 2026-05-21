@@ -7,6 +7,17 @@
 use sqlx::SqlitePool;
 use std::path::Path;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MemoryItem {
+    pub id: String,
+    pub project_root: Option<String>,
+    pub scope: String,
+    pub type_: String,
+    pub content: String,
+    pub confidence: f64,
+    pub updated_at: String,
+}
+
 /// Open (or create) the memory database at the given path.
 pub async fn open(path: &Path) -> anyhow::Result<SqlitePool> {
     if let Some(parent) = path.parent() {
@@ -14,11 +25,13 @@ pub async fn open(path: &Path) -> anyhow::Result<SqlitePool> {
     }
     let url = format!("sqlite://{}?mode=rwc", path.display());
     let pool = SqlitePool::connect(&url).await?;
-    
+
     // Configure SQLite performance and high concurrency optimizations
     let _ = sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await;
-    let _ = sqlx::query("PRAGMA busy_timeout=10000;").execute(&pool).await;
-    
+    let _ = sqlx::query("PRAGMA busy_timeout=10000;")
+        .execute(&pool)
+        .await;
+
     run_migrations(&pool).await?;
     Ok(pool)
 }
@@ -141,4 +154,51 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// Return recent active memories for the project and global user scope.
+pub async fn recent_memory_items(
+    pool: &SqlitePool,
+    project_root: &str,
+    limit: i64,
+) -> anyhow::Result<Vec<MemoryItem>> {
+    let rows = sqlx::query_as::<_, MemoryItemRow>(
+        r#"
+        SELECT id, project_root, scope, type, content, confidence, updated_at
+        FROM memory_items
+        WHERE archived = 0
+          AND (project_root IS NULL OR project_root = ?)
+        ORDER BY updated_at DESC
+        LIMIT ?
+        "#,
+    )
+    .bind(project_root)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| MemoryItem {
+            id: row.id,
+            project_root: row.project_root,
+            scope: row.scope,
+            type_: row.type_,
+            content: row.content,
+            confidence: row.confidence,
+            updated_at: row.updated_at,
+        })
+        .collect())
+}
+
+#[derive(sqlx::FromRow)]
+struct MemoryItemRow {
+    id: String,
+    project_root: Option<String>,
+    scope: String,
+    #[sqlx(rename = "type")]
+    type_: String,
+    content: String,
+    confidence: f64,
+    updated_at: String,
 }

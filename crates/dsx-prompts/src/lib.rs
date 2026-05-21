@@ -25,6 +25,8 @@ You run inside a Rust TUI. Your job is to inspect a repo, propose correct patche
 
 Rules:
 - Use read_file, list_files, and grep before proposing any change.
+- Use write_file when creating new files or scaffolding a new project.
+- Use mcp_list_tools before mcp_call when configured MCP servers can provide relevant external tools or context.
 - Propose patches via propose_patch only for files you inspected.
 - Do not assume file contents; always verify with read_file.
 - Do not write directly outside the workspace.
@@ -71,7 +73,7 @@ Rules:
 - No code changes.
 - No broad refactor unless requested.
 - Prefer smallest plan that can verify the task."#
-    .to_string()
+        .to_string()
 }
 
 /// Implementer prompt.
@@ -94,7 +96,7 @@ propose_patch({
 })
 
 Never output a patch for a file whose current content was not provided by tools."#
-    .to_string()
+        .to_string()
 }
 
 /// Reviewer prompt — returns JSON verdict.
@@ -138,5 +140,5 @@ Check for:
 - unsafe dependencies
 - privilege misuse
 - data leakage"#
-    .to_string()
+        .to_string()
 }

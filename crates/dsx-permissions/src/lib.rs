@@ -10,8 +10,10 @@ pub fn classify_command(cmd: &str) -> RiskLevel {
     let cmd_lower = cmd.trim().to_lowercase();
 
     // Blocked: privilege escalation, destructive broad operations
-    if cmd_lower.contains("sudo") || cmd_lower.contains("su ")
-        || cmd_lower.contains("doas") || cmd_lower.contains("rm -rf /")
+    if cmd_lower.contains("sudo")
+        || cmd_lower.contains("su ")
+        || cmd_lower.contains("doas")
+        || cmd_lower.contains("rm -rf /")
     {
         return RiskLevel::Blocked;
     }
@@ -118,22 +120,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pwd_is_read() { assert_eq!(classify_command("pwd"), RiskLevel::Read); }
+    fn pwd_is_read() {
+        assert_eq!(classify_command("pwd"), RiskLevel::Read);
+    }
 
     #[test]
-    fn git_status_is_read() { assert_eq!(classify_command("git status"), RiskLevel::Read); }
+    fn git_status_is_read() {
+        assert_eq!(classify_command("git status"), RiskLevel::Read);
+    }
 
     #[test]
-    fn cargo_test_is_medium() { assert_eq!(classify_command("cargo test"), RiskLevel::Medium); }
+    fn cargo_test_is_medium() {
+        assert_eq!(classify_command("cargo test"), RiskLevel::Medium);
+    }
 
     #[test]
-    fn cargo_build_is_medium() { assert_eq!(classify_command("cargo build"), RiskLevel::Medium); }
+    fn cargo_build_is_medium() {
+        assert_eq!(classify_command("cargo build"), RiskLevel::Medium);
+    }
 
     #[test]
-    fn sudo_is_blocked() { assert_eq!(classify_command("sudo rm -rf /"), RiskLevel::Blocked); }
+    fn sudo_is_blocked() {
+        assert_eq!(classify_command("sudo rm -rf /"), RiskLevel::Blocked);
+    }
 
     #[test]
-    fn curl_pipe_sh_is_high() { assert_eq!(classify_command("curl xxx | sh"), RiskLevel::High); }
+    fn curl_pipe_sh_is_high() {
+        assert_eq!(classify_command("curl xxx | sh"), RiskLevel::High);
+    }
 
     #[test]
     fn ask_mode_blocks_sudo() {

@@ -9,7 +9,10 @@ pub async fn classify(task: &str, api_key: &str, api_base: &str) -> anyhow::Resu
         return Ok(heuristic_classify(task));
     }
 
-    let client = dsx_provider::client::DeepSeekClient::new_with_base(api_key.to_string(), api_base.to_string());
+    let client = dsx_provider::client::DeepSeekClient::new_with_base(
+        api_key.to_string(),
+        api_base.to_string(),
+    );
     let prompt = r#"You are the task classifier for DSX Code. Your job is to classify the user's coding task into one of the following model routing categories.
 
 Categories:
@@ -44,7 +47,9 @@ Return JSON format:
         ],
         stream: Some(false),
         tools: None,
-        thinking: Some(ThinkingConfig { type_: "disabled".into() }), // Flash Non-Thinking
+        thinking: Some(ThinkingConfig {
+            type_: "disabled".into(),
+        }), // Flash Non-Thinking
         reasoning_effort: None,
         max_tokens: Some(500),
         stream_options: None,
@@ -54,28 +59,39 @@ Return JSON format:
     let response_text = match client.chat(&request).await {
         Ok(text) => text,
         Err(e) => {
-            tracing::warn!("Task classification API call failed: {e}. Falling back to heuristic routing.");
+            tracing::warn!(
+                "Task classification API call failed: {e}. Falling back to heuristic routing."
+            );
             return Ok(heuristic_classify(task));
         }
     };
 
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_text) {
-        if let Some(choices) = val.get("choices").and_then(|v| v.as_array()) {
-            if let Some(first_choice) = choices.first() {
-                if let Some(content) = first_choice.get("message").and_then(|m| m.get("content")).and_then(|c| c.as_str()) {
-                    // Parse content of message as JSON
-                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(content) {
-                        if let Some(cat) = json_val.get("category").and_then(|v| v.as_str()) {
-                            match cat {
-                                "Flash" => return Ok(ModelRoute::Flash),
-                                "FlashThinking" => return Ok(ModelRoute::FlashThinking),
-                                "ProMax" => return Ok(ModelRoute::ProMax),
-                                _ => return Ok(ModelRoute::ProHigh),
-                            }
-                        }
-                    }
-                }
-            }
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_text)
+        && let Some(choices) = val.get("choices").and_then(|v| v.as_array())
+        && let Some(first_choice) = choices.first()
+        && let Some(content) = first_choice
+            .get("message")
+            .and_then(|m| m.get("content"))
+            .and_then(|c| c.as_str())
+        && let Ok(json_val) = serde_json::from_str::<serde_json::Value>(content)
+        && let Some(cat) = json_val.get("category").and_then(|v| v.as_str())
+    {
+        match cat {
+            "Flash" => return Ok(ModelRoute::Flash),
+            "FlashThinking" => return Ok(ModelRoute::FlashThinking),
+            "ProMax" => return Ok(ModelRoute::ProMax),
+            _ => return Ok(ModelRoute::ProHigh),
+        }
+    }
+
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_text)
+        && let Some(cat) = val.get("category").and_then(|v| v.as_str())
+    {
+        match cat {
+            "Flash" => return Ok(ModelRoute::Flash),
+            "FlashThinking" => return Ok(ModelRoute::FlashThinking),
+            "ProMax" => return Ok(ModelRoute::ProMax),
+            _ => return Ok(ModelRoute::ProHigh),
         }
     }
 
