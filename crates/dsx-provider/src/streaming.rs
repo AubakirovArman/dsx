@@ -1,114 +1,7 @@
 //! Streaming types and SSE parser for DeepSeek V4 responses.
 
-use serde::Deserialize;
+pub use crate::streaming_types::*;
 use std::collections::BTreeMap;
-
-// ── Raw deserialized SSE chunk ──────────────────────────────────────
-
-#[derive(Debug, Deserialize)]
-pub struct StreamChunk {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
-    pub object: String,
-    #[serde(default)]
-    pub choices: Vec<StreamChoice>,
-    #[serde(default)]
-    pub usage: Option<Usage>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct StreamChoice {
-    pub index: u32,
-    pub delta: StreamDelta,
-    #[serde(default)]
-    pub finish_reason: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct StreamDelta {
-    #[serde(default)]
-    pub role: Option<String>,
-    #[serde(default)]
-    pub content: Option<String>,
-    #[serde(default)]
-    pub reasoning_content: Option<String>,
-    #[serde(default)]
-    pub tool_calls: Option<Vec<StreamToolCallDelta>>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct StreamToolCallDelta {
-    pub index: u32,
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(rename = "type", default)]
-    pub type_: Option<String>,
-    #[serde(default)]
-    pub function: Option<FunctionDelta>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct FunctionDelta {
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub arguments: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Usage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
-    #[serde(default)]
-    pub reasoning_tokens: Option<u32>,
-    #[serde(default)]
-    pub prompt_cache_hit_tokens: Option<u32>,
-    #[serde(default)]
-    pub prompt_cache_miss_tokens: Option<u32>,
-}
-
-// ── High-level stream events for the agent loop ─────────────────────
-
-/// A single event from the streaming API.
-#[derive(Debug, Clone)]
-pub enum StreamEvent {
-    /// Reasoning tokens (thinking block).
-    Reasoning(String),
-    /// Content tokens (the actual answer).
-    Content(String),
-    /// A complete tool call is ready (accumulated from deltas).
-    ToolCall(ToolCallReady),
-    /// A tool call completed locally.
-    ToolResult {
-        name: String,
-        success: bool,
-        summary: String,
-    },
-    /// Stream ended with a finish reason and usage.
-    Finish {
-        finish_reason: String,
-        usage: Option<Usage>,
-    },
-    /// An execution or API connection error.
-    Error(String),
-    /// Global Agent completion event with final totals.
-    Done {
-        answer: String,
-        iterations: usize,
-        tokens: u64,
-        cost: f64,
-    },
-}
-
-/// A complete tool call ready for execution.
-#[derive(Debug, Clone)]
-pub struct ToolCallReady {
-    pub id: String,
-    pub name: String,
-    pub arguments: String, // raw JSON string
-}
 
 // ── Accumulator for in-progress tool calls ──────────────────────────
 
@@ -198,10 +91,18 @@ pub async fn parse_sse_stream(response: reqwest::Response) -> anyhow::Result<Vec
                         finish_reason: "stop".into(),
                         usage: None,
                     });
-                    continue;
+                    return Ok(events);
                 }
                 // Parse JSON chunk
                 if let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) {
+                    if chunk.choices.is_empty()
+                        && let Some(usage) = chunk.usage.clone()
+                    {
+                        events.push(StreamEvent::Finish {
+                            finish_reason: "usage".into(),
+                            usage: Some(usage),
+                        });
+                    }
                     for choice in &chunk.choices {
                         // Reasoning content
                         if let Some(ref rc) = choice.delta.reasoning_content {
@@ -266,9 +167,17 @@ where
                         finish_reason: "stop".into(),
                         usage: None,
                     });
-                    continue;
+                    return Ok(());
                 }
                 if let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) {
+                    if chunk.choices.is_empty()
+                        && let Some(usage) = chunk.usage.clone()
+                    {
+                        on_event(StreamEvent::Finish {
+                            finish_reason: "usage".into(),
+                            usage: Some(usage),
+                        });
+                    }
                     for choice in &chunk.choices {
                         if let Some(ref rc) = choice.delta.reasoning_content {
                             on_event(StreamEvent::Reasoning(rc.clone()));
@@ -297,77 +206,6 @@ where
     Ok(())
 }
 
-// ── Tests ───────────────────────────────────────────────────────────
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_complete_json() {
-        assert!(!is_complete_json(""));
-        assert!(!is_complete_json("{"));
-        assert!(is_complete_json("{}"));
-        assert!(is_complete_json(r#"{"path": "src/main.rs"}"#));
-        assert!(is_complete_json(r#"{"pattern": "fn main"}"#));
-    }
-
-    #[test]
-    fn test_tool_accumulator_basic() {
-        let mut acc = ToolAccumulator::default();
-        // Simulate streaming tool call deltas
-        let deltas1 = vec![StreamToolCallDelta {
-            index: 0,
-            id: Some("call_1".into()),
-            type_: None,
-            function: Some(FunctionDelta {
-                name: Some("read_file".into()),
-                arguments: Some(r#"{"path":"#.into()),
-            }),
-        }];
-        let r1 = acc.ingest(&deltas1);
-        assert!(r1.is_empty(), "should not be ready yet");
-
-        let deltas2 = vec![StreamToolCallDelta {
-            index: 0,
-            id: None,
-            type_: None,
-            function: Some(FunctionDelta {
-                name: None,
-                arguments: Some(r#""src/main.rs"}"#.into()),
-            }),
-        }];
-        let r2 = acc.ingest(&deltas2);
-        assert_eq!(r2.len(), 1);
-        assert_eq!(r2[0].name, "read_file");
-        assert_eq!(r2[0].arguments, r#"{"path":"src/main.rs"}"#);
-    }
-
-    #[test]
-    fn test_tool_accumulator_multiple_tools() {
-        let mut acc = ToolAccumulator::default();
-        // Two tools interleaved
-        let deltas = vec![
-            StreamToolCallDelta {
-                index: 0,
-                id: Some("call_a".into()),
-                type_: None,
-                function: Some(FunctionDelta {
-                    name: Some("grep".into()),
-                    arguments: Some(r#"{"pattern":"todo"}"#.into()),
-                }),
-            },
-            StreamToolCallDelta {
-                index: 1,
-                id: Some("call_b".into()),
-                type_: None,
-                function: Some(FunctionDelta {
-                    name: Some("read_file".into()),
-                    arguments: Some(r#"{"path":"README.md"}"#.into()),
-                }),
-            },
-        ];
-        let ready = acc.ingest(&deltas);
-        assert_eq!(ready.len(), 2, "both tools should be ready");
-    }
-}
+#[path = "streaming_tests.rs"]
+mod tests;

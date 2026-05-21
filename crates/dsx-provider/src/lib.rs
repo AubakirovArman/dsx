@@ -2,6 +2,7 @@
 
 pub mod client;
 pub mod streaming;
+mod streaming_types;
 pub mod types;
 
 use dsx_core::types::ModelRoute;
