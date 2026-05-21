@@ -25,6 +25,7 @@ mod tests {
 
         let file_tree = app.lock().unwrap().file_tree.clone();
         assert!(file_tree.contains(&"top.txt".into()));
+        assert!(file_tree.contains(&"1234/".into()));
         assert!(!file_tree.iter().any(|path| path.contains("main.rs")));
 
         let _ = std::fs::remove_dir_all(root);

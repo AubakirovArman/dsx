@@ -18,16 +18,27 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 
 /// List files in a directory, respecting `.gitignore`.
 pub fn list_files(dir: &Path) -> anyhow::Result<Vec<String>> {
-    let mut files = Vec::new();
+    let mut entries = Vec::new();
     for entry in WalkBuilder::new(dir).max_depth(Some(1)).build() {
         let entry = entry?;
-        if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
-            && let Some(name) = entry.path().file_name()
-        {
-            files.push(name.to_string_lossy().to_string());
+        let Some(file_type) = entry.file_type() else {
+            continue;
+        };
+        if entry.path() == dir {
+            continue;
+        }
+        if let Some(name) = entry.path().file_name() {
+            let mut label = name.to_string_lossy().to_string();
+            if file_type.is_dir() {
+                label.push('/');
+            }
+            if file_type.is_dir() || file_type.is_file() {
+                entries.push(label);
+            }
         }
     }
-    Ok(files)
+    entries.sort();
+    Ok(entries)
 }
 
 /// Read file content as UTF-8 string.
@@ -75,4 +86,34 @@ pub fn resolve_path_allow_missing(workspace: &Path, relative: &str) -> anyhow::R
     }
 
     Ok(candidate)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_files_includes_shallow_directories() {
+        let root = temp_root("dsx_fs_shallow_dirs");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234/src")).unwrap();
+        std::fs::write(root.join("Cargo.toml"), "[package]\n").unwrap();
+        std::fs::write(root.join("1234/src/main.rs"), "fn main() {}\n").unwrap();
+
+        let files = list_files(&root).unwrap();
+
+        assert!(files.contains(&"1234/".into()));
+        assert!(files.contains(&"Cargo.toml".into()));
+        assert!(!files.contains(&"main.rs".into()));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("{name}_{nanos}"))
+    }
 }
