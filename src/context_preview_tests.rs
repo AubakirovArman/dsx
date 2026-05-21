@@ -68,6 +68,12 @@ mod tests {
                 .contains("previous chat history")
         );
         assert!(
+            value["budget_advice"]
+                .as_str()
+                .unwrap()
+                .contains("dsx context --check")
+        );
+        assert!(
             value["project_context"]
                 .as_str()
                 .unwrap()
@@ -111,6 +117,7 @@ mod tests {
         let err = enforce_request_budget(&preview).unwrap_err();
 
         assert!(err.to_string().contains("over request budget"));
+        assert!(err.to_string().contains("dsx capsule --limit 4"));
         let _ = std::fs::remove_dir_all(root);
     }
 

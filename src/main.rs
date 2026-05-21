@@ -7,6 +7,7 @@ pub mod cli;
 pub mod cli_context_budget;
 #[cfg(test)]
 mod cli_tests;
+pub mod context_budget_advice;
 pub mod context_capsule;
 #[cfg(test)]
 mod context_capsule_tests;

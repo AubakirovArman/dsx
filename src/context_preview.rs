@@ -37,7 +37,7 @@ pub async fn run_context_preview(
     if json {
         println!("{}", preview_json(&preview));
     } else {
-        print_preview(&preview);
+        print_preview(&preview, !check);
     }
     if require_narrow {
         enforce_narrow_scope(&preview)?;
@@ -103,7 +103,7 @@ async fn collect_preview_context(active_root: &Path) -> anyhow::Result<dsx_conte
     })
 }
 
-fn print_preview(preview: &ContextPreview) {
+fn print_preview(preview: &ContextPreview, show_budget_advice: bool) {
     println!("Context preview:");
     println!("  Task: {}", crate::handlers::task_preview(&preview.task));
     println!(
@@ -133,9 +133,15 @@ fn print_preview(preview: &ContextPreview) {
         preview.metrics.task_brief_chars,
         preview.metrics.project_instructions_chars
     );
+    if show_budget_advice && preview.metrics.request_budget_status == "over" {
+        println!(
+            "\nBudget advice:\n{}\n",
+            crate::context_budget_advice::budget_advice(preview)
+        );
+    }
     println!("\nSystem scope note:\n{}\n", preview.system_note);
     println!(
-        "Context capsule:\n{}\n",
+        "{}\n",
         dsx_agent::prompt::context_capsule(&preview.task_brief)
     );
     if let Some(instructions) = &preview.project_instructions {
@@ -155,6 +161,7 @@ pub(crate) fn preview_json(preview: &ContextPreview) -> serde_json::Value {
         "system_note": preview.system_note,
         "task_brief": preview.task_brief,
         "context_capsule": dsx_agent::prompt::context_capsule(&preview.task_brief),
+        "budget_advice": crate::context_budget_advice::budget_advice(preview),
         "project_instructions": preview.project_instructions,
         "project_context": preview.project_context,
         "metrics": {
@@ -174,7 +181,8 @@ pub(crate) fn enforce_request_budget(preview: &ContextPreview) -> anyhow::Result
     let limit = preview.metrics.max_request_tokens;
     if estimated > limit {
         anyhow::bail!(
-            "Context preview over request budget: estimated {estimated} tokens, limit {limit}. Narrow the task scope or reduce context before calling the model."
+            "{}",
+            crate::context_budget_advice::over_budget_error(preview)
         );
     }
     Ok(())
