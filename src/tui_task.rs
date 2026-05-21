@@ -99,7 +99,6 @@ pub(crate) struct PreparedTask {
     pub(crate) ledger_id: Option<String>,
     pub(crate) task: String,
     pub(crate) api_key: String,
-    pub(crate) project_root: PathBuf,
     pub(crate) active_root: PathBuf,
     pub(crate) mode: dsx_core::types::PermissionMode,
 }
@@ -144,10 +143,13 @@ pub(crate) fn prepare_task(
         ledger_id: None,
         task,
         api_key: api_key.to_string(),
-        project_root: project_root.to_path_buf(),
         active_root: scope.active_root,
         mode,
     })
+}
+
+pub(crate) fn agent_workspace(task: &PreparedTask) -> PathBuf {
+    task.active_root.clone()
 }
 
 fn spawn_agent(
@@ -159,7 +161,7 @@ fn spawn_agent(
 ) -> AbortHandle {
     rt.spawn(async move {
         let config = dsx_agent::AgentConfig {
-            project_root: task.project_root,
+            project_root: agent_workspace(&task),
             api_key: task.api_key,
             api_base,
             max_iterations: 15,

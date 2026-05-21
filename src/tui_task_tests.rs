@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_task::{prepare_task, stop_agent_task};
+    use crate::tui_task::{agent_workspace, prepare_task, stop_agent_task};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -60,6 +60,7 @@ mod tests {
         let prepared = prepare_task(&app, &root, "key").unwrap();
 
         assert_eq!(prepared.active_root, target.canonicalize().unwrap());
+        assert_eq!(agent_workspace(&prepared), target.canonicalize().unwrap());
         let app = app.lock().unwrap();
         assert_eq!(app.scope_lock.launch_scope, root.display().to_string());
         assert_eq!(
