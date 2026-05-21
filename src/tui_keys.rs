@@ -20,14 +20,14 @@ pub async fn handle_key(
     pool: &Option<sqlx::SqlitePool>,
     rt: &Handle,
 ) -> anyhow::Result<KeyOutcome> {
-    if let Some(outcome) = handle_modal_key(key, app) {
+    if let Some(outcome) = handle_modal_key(key, app, rt) {
         return Ok(outcome);
     }
 
     match key.code {
         KeyCode::Char('c') if ctrl(key) => Ok(KeyOutcome::Quit),
         KeyCode::Char('k') if ctrl(key) => {
-            crate::tui_task::stop_agent_task(app);
+            crate::tui_task::stop_agent_task(app, rt);
             Ok(KeyOutcome::Continue)
         }
         KeyCode::Enter => {
@@ -52,9 +52,9 @@ pub async fn handle_key(
     }
 }
 
-fn handle_modal_key(key: KeyEvent, app: &SharedApp) -> Option<KeyOutcome> {
+fn handle_modal_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> Option<KeyOutcome> {
     if app.lock().unwrap().pending_approval.is_some() {
-        return Some(handle_approval_key(key, app));
+        return Some(handle_approval_key(key, app, rt));
     }
     if app.lock().unwrap().show_diff {
         return Some(handle_diff_key(key, app));
@@ -65,7 +65,7 @@ fn handle_modal_key(key: KeyEvent, app: &SharedApp) -> Option<KeyOutcome> {
     None
 }
 
-fn handle_approval_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
+fn handle_approval_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> KeyOutcome {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             answer_approval(app, true);
@@ -76,7 +76,7 @@ fn handle_approval_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
             KeyOutcome::Continue
         }
         KeyCode::Char('k') if ctrl(key) => {
-            crate::tui_task::stop_agent_task(app);
+            crate::tui_task::stop_agent_task(app, rt);
             KeyOutcome::Continue
         }
         KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,

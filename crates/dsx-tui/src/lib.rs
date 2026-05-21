@@ -24,6 +24,8 @@ pub struct App {
     pub model: String,
     pub tokens: u64,
     pub cost: f64,
+    pub run_start_tokens: u64,
+    pub run_start_cost: f64,
     pub agent_task: AgentTask,
     pub cursor_pos: usize,
     pub scroll_offset: u16,
@@ -40,6 +42,7 @@ pub struct App {
     pub api_key: String,
     pub budget_status: String,
     pub active_run_id: Option<u64>,
+    pub active_ledger_id: Option<String>,
     pub next_run_id: u64,
     pub agent_abort: Option<tokio::task::AbortHandle>,
     pub compaction_events: u64,
@@ -77,6 +80,8 @@ impl App {
             model: "v4-pro".into(),
             tokens: 0,
             cost: 0.0,
+            run_start_tokens: 0,
+            run_start_cost: 0.0,
             agent_task: AgentTask::Idle,
             cursor_pos: 0,
             scroll_offset: 0,
@@ -93,6 +98,7 @@ impl App {
             api_key: String::new(),
             budget_status: String::new(),
             active_run_id: None,
+            active_ledger_id: None,
             next_run_id: 0,
             agent_abort: None,
             compaction_events: 0,
@@ -183,6 +189,8 @@ impl App {
     }
 
     pub fn begin_task(&mut self, task: &str, active_scope: &str) {
+        self.run_start_tokens = self.tokens;
+        self.run_start_cost = self.cost;
         self.task_brief = TaskBriefPanel {
             goal: truncate_chars(task, 260),
             done: "Task accepted; context brief prepared.".into(),

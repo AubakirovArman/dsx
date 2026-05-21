@@ -7,8 +7,13 @@
 use sqlx::SqlitePool;
 use std::path::Path;
 
+pub mod run_ledger;
 pub mod task_summary;
 
+pub use run_ledger::{
+    AgentRunRecord, AgentRunUpdate, finish_agent_run, load_agent_run, recent_agent_runs,
+    recent_agent_runs_any, start_agent_run,
+};
 pub use task_summary::{TaskSummary, load_task_summary, upsert_task_summary};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -74,6 +79,29 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
             cache_miss_tokens INTEGER,
             estimated_cost_usd REAL
         );
+
+        CREATE TABLE IF NOT EXISTS agent_runs (
+            id TEXT PRIMARY KEY,
+            session_id TEXT,
+            project_root TEXT NOT NULL,
+            task_excerpt TEXT NOT NULL,
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            prompt_tokens INTEGER NOT NULL DEFAULT 0,
+            completion_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_cost_usd REAL NOT NULL DEFAULT 0,
+            compaction_events INTEGER NOT NULL DEFAULT 0,
+            compacted_messages INTEGER NOT NULL DEFAULT 0,
+            estimated_tokens_saved INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            cancelled INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_project_started
+        ON agent_runs(project_root, started_at DESC);
 
         CREATE TABLE IF NOT EXISTS memory_items (
             id TEXT PRIMARY KEY,

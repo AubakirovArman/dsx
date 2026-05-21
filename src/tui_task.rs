@@ -15,10 +15,11 @@ pub async fn start_agent_task(
     pool: &Option<sqlx::SqlitePool>,
     rt: &Handle,
 ) -> anyhow::Result<()> {
-    let Some(prepared) = prepare_task(app, project_root, api_key) else {
+    let Some(mut prepared) = prepare_task(app, project_root, api_key) else {
         return Ok(());
     };
     crate::session_state::record_task_started(&prepared.active_root, &prepared.task).await?;
+    prepared.ledger_id = start_run_ledger(app, session_id, &prepared).await;
     persist_user_message(session_id, pool, rt, &prepared.task);
 
     let api_base = app.lock().unwrap().api_base.clone();
@@ -62,7 +63,7 @@ pub async fn start_agent_task(
     Ok(())
 }
 
-pub fn stop_agent_task(app: &SharedApp) -> bool {
+pub fn stop_agent_task(app: &SharedApp, rt: &Handle) -> bool {
     let mut app = app.lock().unwrap();
     let Some(abort) = app.agent_abort.take() else {
         app.add_message("system", "No active agent run to stop.");
@@ -70,6 +71,13 @@ pub fn stop_agent_task(app: &SharedApp) -> bool {
     };
 
     abort.abort();
+    let ledger_id = app.active_ledger_id.take();
+    let active_scope = app.task_brief.active_scope.clone();
+    let snapshot = crate::run_ledger::RunLedgerSnapshot::from_app(
+        &app,
+        "cancelled",
+        Some("cancelled by user".into()),
+    );
     if let Some(approval) = app.pending_approval.take() {
         let _ = approval.tx.send(false);
     }
@@ -80,20 +88,26 @@ pub fn stop_agent_task(app: &SharedApp) -> bool {
     app.task_brief.last_changes = "Abort requested from TUI.".into();
     app.task_brief.next_step = "Review partial output or enter a narrower task.".into();
     app.add_message("system", "⏹ Agent run cancelled by user.");
+    persist_run_ledger(rt, ledger_id, active_scope, snapshot);
     true
 }
 
 #[derive(Clone)]
-struct PreparedTask {
-    run_id: u64,
-    task: String,
-    api_key: String,
-    project_root: PathBuf,
-    active_root: PathBuf,
-    mode: dsx_core::types::PermissionMode,
+pub(crate) struct PreparedTask {
+    pub(crate) run_id: u64,
+    pub(crate) ledger_id: Option<String>,
+    pub(crate) task: String,
+    pub(crate) api_key: String,
+    pub(crate) project_root: PathBuf,
+    pub(crate) active_root: PathBuf,
+    pub(crate) mode: dsx_core::types::PermissionMode,
 }
 
-fn prepare_task(app: &SharedApp, project_root: &Path, api_key: &str) -> Option<PreparedTask> {
+pub(crate) fn prepare_task(
+    app: &SharedApp,
+    project_root: &Path,
+    api_key: &str,
+) -> Option<PreparedTask> {
     let mut app = app.lock().unwrap();
     let task = app.input.clone();
     if task.trim().is_empty() {
@@ -120,12 +134,34 @@ fn prepare_task(app: &SharedApp, project_root: &Path, api_key: &str) -> Option<P
 
     Some(PreparedTask {
         run_id,
+        ledger_id: None,
         task,
         api_key: api_key.to_string(),
         project_root: project_root.to_path_buf(),
         active_root,
         mode,
     })
+}
+
+async fn start_run_ledger(
+    app: &SharedApp,
+    session_id: &Option<String>,
+    task: &PreparedTask,
+) -> Option<String> {
+    match crate::run_ledger::record_started(&task.active_root, session_id.as_deref(), &task.task)
+        .await
+    {
+        Ok(id) => {
+            app.lock().unwrap().active_ledger_id = Some(id.clone());
+            Some(id)
+        }
+        Err(e) => {
+            app.lock()
+                .unwrap()
+                .add_message("error", &format!("Run ledger start failed: {e}"));
+            None
+        }
+    }
 }
 
 fn spawn_agent(
@@ -187,17 +223,19 @@ pub(crate) fn finish_task(
     run_id: u64,
     rt: Handle,
 ) {
-    let (assistant, brief, tools, cost, tokens) = {
+    let (assistant, brief, tools, cost, tokens, ledger_id, snapshot) = {
         let mut app = app.lock().unwrap();
         if app.active_run_id != Some(run_id) {
             return;
         }
         app.active_run_id = None;
         app.agent_abort = None;
-        let completed = matches!(app.agent_task, dsx_tui::AgentTask::Running(_));
+        let (status, error) = run_status(&app.agent_task);
+        let completed = status == "completed";
         if completed {
             app.agent_task = dsx_tui::AgentTask::Done("ready".into());
         }
+        let snapshot = crate::run_ledger::RunLedgerSnapshot::from_app(&app, status, error);
         let assistant = completed
             .then(|| {
                 app.messages
@@ -212,12 +250,16 @@ pub(crate) fn finish_task(
             app.tool_timeline.clone(),
             app.cost,
             app.tokens,
+            app.active_ledger_id.take(),
+            snapshot,
         )
     };
 
+    let summary_root = active_root.clone();
     rt.spawn(async move {
-        let _ = crate::session_state::record_task_finished(&active_root, &brief, &tools).await;
+        let _ = crate::session_state::record_task_finished(&summary_root, &brief, &tools).await;
     });
+    persist_run_ledger(&rt, ledger_id, active_root.clone(), snapshot);
     if let (Some(msg), Some(sid), Some(pool)) = (assistant, session_id, pool) {
         let sm = dsx_session::SessionManager::new(pool);
         rt.spawn(async move {
@@ -232,51 +274,24 @@ pub(crate) fn finish_task(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::{Arc, Mutex};
-
-    #[test]
-    fn prepare_task_blocks_parallel_run_and_keeps_input() {
-        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
-        {
-            let mut app = app.lock().unwrap();
-            app.input = "second task".into();
-            app.agent_task = dsx_tui::AgentTask::Running("first task".into());
-        }
-
-        let prepared = prepare_task(&app, std::path::Path::new("/tmp"), "key");
-
-        assert!(prepared.is_none());
-        let app = app.lock().unwrap();
-        assert_eq!(app.input, "second task");
-        assert!(
-            app.messages
-                .iter()
-                .any(|msg| msg.content.contains("already running"))
-        );
+fn run_status(task: &dsx_tui::AgentTask) -> (&'static str, Option<String>) {
+    match task {
+        dsx_tui::AgentTask::Error(err) => ("error", Some(err.clone())),
+        _ => ("completed", None),
     }
+}
 
-    #[test]
-    fn prepare_task_allows_idle_task() {
-        let root = std::env::temp_dir().join("dsx_prepare_task_idle");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
-        app.lock().unwrap().input = "do work".into();
-
-        let prepared = prepare_task(&app, &root, "key").unwrap();
-
-        assert_eq!(prepared.task, "do work");
-        assert_eq!(prepared.api_key, "key");
-        assert_eq!(prepared.run_id, 1);
-        assert_eq!(app.lock().unwrap().active_run_id, Some(1));
-        assert!(matches!(
-            app.lock().unwrap().agent_task,
-            dsx_tui::AgentTask::Running(_)
-        ));
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
+fn persist_run_ledger(
+    rt: &Handle,
+    ledger_id: Option<String>,
+    active_scope: impl Into<PathBuf>,
+    snapshot: crate::run_ledger::RunLedgerSnapshot,
+) {
+    let Some(ledger_id) = ledger_id else {
+        return;
+    };
+    let active_scope = active_scope.into();
+    rt.spawn(async move {
+        let _ = crate::run_ledger::record_finished(&active_scope, &ledger_id, snapshot).await;
+    });
 }

@@ -4,6 +4,7 @@ pub mod cli;
 pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
+pub mod run_ledger;
 pub mod session_state;
 pub mod tui_keys;
 pub mod tui_runner;
@@ -16,8 +17,8 @@ mod tui_task_tests;
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
 use handlers::{
-    list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
-    run_mcp_list, run_plan, task_preview,
+    list_agent_runs, list_sessions, run_edit, run_eval, run_index_build, run_index_search,
+    run_mcp_call, run_mcp_list, run_plan, task_preview,
 };
 
 #[tokio::main]
@@ -165,6 +166,7 @@ async fn run_workspace_action(
 ) -> anyhow::Result<()> {
     match action {
         None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
+        Some(WorkspaceAction::Runs { limit }) => list_agent_runs(&project_root, limit).await,
         Some(WorkspaceAction::Resume { id }) => {
             let Some(key) = require_api_key(api_key) else {
                 return Ok(());

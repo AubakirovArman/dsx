@@ -2,8 +2,51 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_task::stop_agent_task;
+    use crate::tui_task::{prepare_task, stop_agent_task};
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn prepare_task_blocks_parallel_run_and_keeps_input() {
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        {
+            let mut app = app.lock().unwrap();
+            app.input = "second task".into();
+            app.agent_task = dsx_tui::AgentTask::Running("first task".into());
+        }
+
+        let prepared = prepare_task(&app, std::path::Path::new("/tmp"), "key");
+
+        assert!(prepared.is_none());
+        let app = app.lock().unwrap();
+        assert_eq!(app.input, "second task");
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("already running"))
+        );
+    }
+
+    #[test]
+    fn prepare_task_allows_idle_task() {
+        let root = temp_root("dsx_prepare_task_idle");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        app.lock().unwrap().input = "do work".into();
+
+        let prepared = prepare_task(&app, &root, "key").unwrap();
+
+        assert_eq!(prepared.task, "do work");
+        assert_eq!(prepared.api_key, "key");
+        assert_eq!(prepared.run_id, 1);
+        assert_eq!(app.lock().unwrap().active_run_id, Some(1));
+        assert!(matches!(
+            app.lock().unwrap().agent_task,
+            dsx_tui::AgentTask::Running(_)
+        ));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[tokio::test]
     async fn stop_agent_task_aborts_handle_and_clears_state() {
@@ -23,7 +66,7 @@ mod tests {
             });
         }
 
-        assert!(stop_agent_task(&app));
+        assert!(stop_agent_task(&app, &tokio::runtime::Handle::current()));
 
         assert!(!rx.await.unwrap());
         assert!(task.await.unwrap_err().is_cancelled());
@@ -32,6 +75,47 @@ mod tests {
         assert!(app.pending_approval.is_none());
         assert_eq!(app.active_run_id, None);
         assert!(matches!(app.agent_task, dsx_tui::AgentTask::Error(_)));
+    }
+
+    #[tokio::test]
+    async fn stop_agent_task_records_cancelled_run() {
+        let root = temp_root("dsx_cancelled_run_ledger");
+        std::fs::create_dir_all(&root).unwrap();
+        let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let ledger_id = dsx_memory::start_agent_run(
+            &pool,
+            Some("sid"),
+            &root.display().to_string(),
+            "long task",
+        )
+        .await
+        .unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        let task = tokio::spawn(async { std::future::pending::<()>().await });
+        {
+            let mut app = app.lock().unwrap();
+            app.agent_abort = Some(task.abort_handle());
+            app.active_run_id = Some(9);
+            app.active_ledger_id = Some(ledger_id.clone());
+            app.agent_task = dsx_tui::AgentTask::Running("work".into());
+            app.task_brief.active_scope = root.display().to_string();
+        }
+
+        assert!(stop_agent_task(&app, &tokio::runtime::Handle::current()));
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+
+        let run = dsx_memory::load_agent_run(&pool, &ledger_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(run.status, "cancelled");
+        assert!(run.cancelled);
+        assert!(run.finished_at.is_some());
+
+        let _ = pool.close().await;
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[tokio::test]

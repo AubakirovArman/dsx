@@ -80,6 +80,12 @@ pub enum WorkspaceAction {
         #[arg(required = true)]
         id: String,
     },
+    /// List recent agent run ledger rows
+    Runs {
+        /// Maximum runs to show
+        #[arg(short, long, default_value_t = 20)]
+        limit: u32,
+    },
 }
 
 #[derive(Subcommand, Clone)]

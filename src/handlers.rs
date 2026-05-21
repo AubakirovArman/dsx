@@ -228,3 +228,36 @@ pub async fn list_sessions(project_root: &Path) {
         Err(e) => println!("DB error: {e}"),
     }
 }
+
+pub async fn list_agent_runs(project_root: &Path, limit: u32) {
+    let db_path = project_root.join(".dsx").join("sessions.db");
+    match dsx_memory::open(&db_path).await {
+        Ok(pool) => {
+            let project_root = project_root.display().to_string();
+            match dsx_memory::recent_agent_runs(&pool, &project_root, limit as i64).await {
+                Ok(runs) if runs.is_empty() => println!("No agent runs yet."),
+                Ok(runs) => {
+                    println!("Recent agent runs:");
+                    for run in &runs {
+                        println!(
+                            "  {}  {}  {} tok  ${:.4}  compact:{}/~{}tok  {}",
+                            &run.id[..8.min(run.id.len())],
+                            run.status,
+                            run.total_tokens,
+                            run.estimated_cost_usd,
+                            run.compaction_events,
+                            run.estimated_tokens_saved,
+                            run.started_at.chars().take(19).collect::<String>(),
+                        );
+                        println!("      {}", task_preview(&run.task_excerpt));
+                        if let Some(error) = &run.error {
+                            println!("      error: {}", task_preview(error));
+                        }
+                    }
+                }
+                Err(e) => println!("Error: {e}"),
+            }
+        }
+        Err(e) => println!("DB error: {e}"),
+    }
+}
