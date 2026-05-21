@@ -13,9 +13,10 @@ pub(crate) struct WorkspaceNote {
     pub(crate) architecture: String,
 }
 
-pub async fn list_workspace_notes(project_root: &Path, limit: u32, all: bool) {
+pub async fn list_workspace_notes(project_root: &Path, limit: u32, all: bool, json: bool) {
     match collect_workspace_notes(project_root, limit, all).await {
         Ok(notes) if notes.is_empty() => println!("No workspace notes yet."),
+        Ok(notes) if json => println!("{}", notes_json_value(&notes)),
         Ok(notes) => print_notes(&notes, all),
         Err(e) => println!("Workspace notes error: {e}"),
     }
@@ -131,6 +132,23 @@ fn print_notes(notes: &[WorkspaceNote], all: bool) {
 
 fn print_field(label: &str, value: &str) {
     println!("      {label}: {}", value.replace('\n', " | "));
+}
+
+pub(crate) fn notes_json_value(notes: &[WorkspaceNote]) -> serde_json::Value {
+    serde_json::Value::Array(notes.iter().map(note_json_value).collect())
+}
+
+fn note_json_value(note: &WorkspaceNote) -> serde_json::Value {
+    serde_json::json!({
+        "scope": note.label,
+        "saved": note.saved,
+        "goal": note.goal,
+        "done": note.done,
+        "plan": note.plan,
+        "last_changes": note.last_changes,
+        "next_step": note.next_step,
+        "architecture": note.architecture,
+    })
 }
 
 fn scope_label(project_root: &Path, scope: &Path) -> String {

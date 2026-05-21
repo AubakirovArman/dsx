@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::workspace_notes::collect_workspace_notes;
+    use crate::workspace_notes::{collect_workspace_notes, notes_json_value};
 
     #[tokio::test]
     async fn notes_collect_saved_root_and_child_fallbacks() {
@@ -39,6 +39,26 @@ mod tests {
 
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].label, ".");
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn notes_json_contains_context_fields() {
+        let root = temp_root("dsx_workspace_notes_json");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        seed_summary(&root, "json goal", "json plan").await;
+
+        let notes = collect_workspace_notes(&root, 1, false).await.unwrap();
+        let value = notes_json_value(&notes);
+        let first = value.as_array().unwrap().first().unwrap();
+
+        assert_eq!(first["scope"], ".");
+        assert_eq!(first["saved"], true);
+        assert_eq!(first["goal"], "json goal");
+        assert_eq!(first["plan"], "json plan");
+        assert!(first.get("architecture").is_some());
 
         let _ = std::fs::remove_dir_all(root);
     }

@@ -103,6 +103,9 @@ pub enum WorkspaceAction {
         /// Include direct child folders under the launch workspace
         #[arg(long)]
         all: bool,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
     },
     /// Mark unfinished running run rows as stale across scopes
     CloseStaleRuns {

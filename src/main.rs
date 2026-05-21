@@ -190,8 +190,8 @@ async fn run_workspace_action(
         Some(WorkspaceAction::Runs { limit, all }) => {
             list_agent_runs(&project_root, limit, all).await
         }
-        Some(WorkspaceAction::Notes { limit, all }) => {
-            list_workspace_notes(&project_root, limit, all).await
+        Some(WorkspaceAction::Notes { limit, all, json }) => {
+            list_workspace_notes(&project_root, limit, all, json).await
         }
         Some(WorkspaceAction::CloseStaleRuns {
             older_than_minutes,
