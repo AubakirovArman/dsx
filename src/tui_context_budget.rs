@@ -29,7 +29,7 @@ pub(crate) async fn preflight_context_budget(app: &SharedApp, task: &str) -> boo
 }
 
 pub(crate) fn mark_ready(app: &SharedApp, preview: &ContextPreview) {
-    let line = budget_line(preview);
+    let line = crate::context_preview::budget_line(preview);
     let mut app = app.lock().unwrap();
     app.budget_status = line.clone();
     app.task_brief.done = "Context capsule prepared before model call.".into();
@@ -54,13 +54,4 @@ pub(crate) fn block_with_error(app: &SharedApp, task: &str, error: &str) {
         "system",
         &format!("Context budget preflight blocked: {error}"),
     );
-}
-
-fn budget_line(preview: &ContextPreview) -> String {
-    format!(
-        "capsule request ~{} / {} tokens ({})",
-        preview.metrics.estimated_request_tokens,
-        preview.metrics.max_request_tokens,
-        preview.metrics.request_budget_status
-    )
 }

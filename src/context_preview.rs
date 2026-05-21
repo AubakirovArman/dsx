@@ -126,6 +126,7 @@ fn print_preview(preview: &ContextPreview) {
         preview.metrics.max_request_tokens,
         preview.metrics.request_budget_status
     );
+    println!("  Capsule budget: {}", budget_line(preview));
     println!(
         "  Context chars: project={} brief={} instructions={}",
         preview.metrics.project_context_chars,
@@ -177,6 +178,15 @@ pub(crate) fn enforce_request_budget(preview: &ContextPreview) -> anyhow::Result
         );
     }
     Ok(())
+}
+
+pub(crate) fn budget_line(preview: &ContextPreview) -> String {
+    format!(
+        "capsule request ~{} / {} tokens ({})",
+        preview.metrics.estimated_request_tokens,
+        preview.metrics.max_request_tokens,
+        preview.metrics.request_budget_status
+    )
 }
 
 pub(crate) fn enforce_narrow_scope(preview: &ContextPreview) -> anyhow::Result<()> {

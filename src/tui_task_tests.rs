@@ -192,12 +192,7 @@ mod tests {
         }
 
         assert!(stop_agent_task(&app, &tokio::runtime::Handle::current()));
-        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
-
-        let run = dsx_memory::load_agent_run(&pool, &ledger_id)
-            .await
-            .unwrap()
-            .unwrap();
+        let run = wait_for_run_status(&pool, &ledger_id, "cancelled").await;
         assert_eq!(run.status, "cancelled");
         assert!(run.cancelled);
         assert!(run.finished_at.is_some());
@@ -241,5 +236,26 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("{name}_{nanos}"))
+    }
+
+    async fn wait_for_run_status(
+        pool: &sqlx::SqlitePool,
+        ledger_id: &str,
+        expected: &str,
+    ) -> dsx_memory::AgentRunRecord {
+        for _ in 0..20 {
+            let run = dsx_memory::load_agent_run(pool, ledger_id)
+                .await
+                .unwrap()
+                .unwrap();
+            if run.status == expected {
+                return run;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        dsx_memory::load_agent_run(pool, ledger_id)
+            .await
+            .unwrap()
+            .unwrap()
     }
 }

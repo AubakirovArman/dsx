@@ -12,6 +12,7 @@ pub async fn run_plan(
 ) -> anyhow::Result<()> {
     let scope =
         crate::agent_preflight::prepare_agent_start_scope(&project_root, task, allow_wide_scope)?;
+    crate::cli_context_budget::preflight_cli_context_budget(&project_root, task).await?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,
@@ -44,6 +45,7 @@ pub async fn run_edit(
 ) -> anyhow::Result<()> {
     let scope =
         crate::agent_preflight::prepare_agent_start_scope(&project_root, task, allow_wide_scope)?;
+    crate::cli_context_budget::preflight_cli_context_budget(&project_root, task).await?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,

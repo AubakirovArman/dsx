@@ -4,6 +4,7 @@ pub mod agent_preflight;
 #[cfg(test)]
 mod agent_preflight_tests;
 pub mod cli;
+pub mod cli_context_budget;
 #[cfg(test)]
 mod cli_tests;
 pub mod context_capsule;
