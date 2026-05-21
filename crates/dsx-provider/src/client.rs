@@ -20,8 +20,12 @@ impl DeepSeekClient {
         if clean_base.is_empty() {
             clean_base = "https://api.deepseek.com".to_string();
         }
+        let req_client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| Client::new());
         Self {
-            client: Client::new(),
+            client: req_client,
             base_url: clean_base,
             api_key,
         }
@@ -34,6 +38,7 @@ impl DeepSeekClient {
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(request)
+            .timeout(std::time::Duration::from_secs(12))
             .send()
             .await?;
         let text = resp.text().await?;
