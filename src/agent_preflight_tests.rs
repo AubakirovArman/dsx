@@ -15,6 +15,7 @@ mod tests {
 
         assert!(!preflight.allowed());
         assert!(!preflight.narrowed);
+        assert_eq!(preflight.policy_source, "container_guard");
         assert!(
             preflight
                 .reason
@@ -35,6 +36,7 @@ mod tests {
 
         assert!(preflight.allowed());
         assert!(preflight.allow_wide_scope);
+        assert_eq!(preflight.policy_source, "allow_wide_policy");
         assert!(preflight.reason.contains("explicit CLI/config policy"));
         let _ = std::fs::remove_dir_all(root);
     }
@@ -51,6 +53,7 @@ mod tests {
 
         assert!(preflight.allowed());
         assert!(preflight.narrowed);
+        assert_eq!(preflight.policy_source, "task_scope");
         assert_eq!(
             preflight.active,
             target.canonicalize().unwrap().display().to_string()
@@ -89,7 +92,21 @@ mod tests {
                 .unwrap();
 
         assert!(text.contains("Agent preflight"));
+        assert!(text.contains("Policy source: container_guard"));
         assert!(text.contains("Decision: BLOCKED"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn preflight_reports_explicit_wide_intent_source() {
+        let root = temp_root("dsx_preflight_wide_intent");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+
+        let preflight = build_agent_preflight(&root, "проверь весь воркспейс", false);
+
+        assert!(preflight.allowed());
+        assert_eq!(preflight.policy_source, "task_wide_intent");
         let _ = std::fs::remove_dir_all(root);
     }
 

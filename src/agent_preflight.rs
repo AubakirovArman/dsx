@@ -9,6 +9,7 @@ pub(crate) struct AgentPreflight {
     pub(crate) narrowed: bool,
     pub(crate) active_exists: bool,
     pub(crate) allow_wide_scope: bool,
+    pub(crate) policy_source: String,
     pub(crate) blocker: Option<String>,
     pub(crate) reason: String,
 }
@@ -81,6 +82,7 @@ pub(crate) fn build_agent_preflight(
     )
     .map(str::to_string);
     let reason = decision_reason(scope.narrowed, allow_wide_scope, blocker.as_deref());
+    let policy_source = policy_source(task, scope.narrowed, allow_wide_scope, blocker.as_deref());
     AgentPreflight {
         task: task_preview(task),
         launch: scope.launch_label,
@@ -88,6 +90,7 @@ pub(crate) fn build_agent_preflight(
         active: scope.active_label,
         narrowed: scope.narrowed,
         allow_wide_scope,
+        policy_source,
         blocker,
         reason,
     }
@@ -106,13 +109,14 @@ pub(crate) fn render_text(preflight: &AgentPreflight) -> String {
         "no"
     };
     format!(
-        "Agent preflight:\n  Task: {}\n  Launch: {}\n  Active: {}\n  Scope: {}\n  Active exists: {}\n  Allow wide policy: {}\n  Decision: {}\n  Reason: {}\n",
+        "Agent preflight:\n  Task: {}\n  Launch: {}\n  Active: {}\n  Scope: {}\n  Active exists: {}\n  Allow wide policy: {}\n  Policy source: {}\n  Decision: {}\n  Reason: {}\n",
         preflight.task,
         preflight.launch,
         preflight.active,
         scope,
         active_exists,
         allow_wide,
+        preflight.policy_source,
         preflight.decision().to_uppercase(),
         preflight.reason,
     )
@@ -126,11 +130,31 @@ fn render_json(preflight: &AgentPreflight) -> serde_json::Value {
         "narrowed": preflight.narrowed,
         "active_exists": preflight.active_exists,
         "allow_wide_scope": preflight.allow_wide_scope,
+        "policy_source": preflight.policy_source,
         "allowed": preflight.allowed(),
         "decision": preflight.decision(),
         "reason": preflight.reason,
         "blocker": preflight.blocker,
     })
+}
+
+fn policy_source(
+    task: &str,
+    narrowed: bool,
+    allow_wide_scope: bool,
+    blocker: Option<&str>,
+) -> String {
+    if blocker.is_some() {
+        "container_guard".into()
+    } else if narrowed {
+        "task_scope".into()
+    } else if allow_wide_scope {
+        "allow_wide_policy".into()
+    } else if crate::scope_guard::has_explicit_wide_intent(task) {
+        "task_wide_intent".into()
+    } else {
+        "workspace_safe".into()
+    }
 }
 
 fn decision_reason(narrowed: bool, allow_wide_scope: bool, blocker: Option<&str>) -> String {

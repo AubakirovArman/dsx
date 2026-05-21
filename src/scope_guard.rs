@@ -10,7 +10,7 @@ pub(crate) fn wide_scope_blocker(
 ) -> Option<&'static str> {
     if allow_wide_scope
         || narrowed
-        || explicit_wide_intent(task)
+        || has_explicit_wide_intent(task)
         || !looks_like_container(launch_root)
     {
         return None;
@@ -90,7 +90,7 @@ fn skip_dir(name: &str) -> bool {
     matches!(name, ".git" | ".dsx" | "target" | "node_modules") || name.starts_with('.')
 }
 
-fn explicit_wide_intent(task: &str) -> bool {
+pub(crate) fn has_explicit_wide_intent(task: &str) -> bool {
     let lower = task.to_lowercase();
     [
         "whole workspace",

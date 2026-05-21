@@ -97,6 +97,11 @@ mod tests {
                 .any(|msg| msg.content.contains("Agent preflight")
                     && msg.content.contains("Decision: BLOCKED"))
         );
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("Policy source: container_guard"))
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
