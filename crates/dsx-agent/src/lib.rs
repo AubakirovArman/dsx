@@ -2,6 +2,8 @@
 
 pub mod classify;
 pub mod runner_sync;
+pub mod scope;
+pub mod tool_defs;
 pub mod tool_executor;
 pub mod tool_executor_tests;
 pub mod tool_implementations;
@@ -9,14 +11,15 @@ pub mod types;
 
 pub use classify::{classify, heuristic_classify};
 pub use runner_sync::run;
+pub use tool_defs::build_tool_defs;
 pub use types::{AgentConfig, AgentOutcome, ApprovalRequest, ToolResult};
 
 use dsx_provider::streaming::StreamEvent;
 use dsx_provider::types::{
-    ChatRequest, FunctionCall, FunctionDef, Message, StreamOptions, ThinkingConfig, ToolCall,
-    ToolDef,
+    ChatRequest, FunctionCall, Message, StreamOptions, ThinkingConfig, ToolCall,
 };
 use tokio::sync::mpsc;
+use tool_defs::{summarize_tool_result, summarize_tool_results};
 
 // Pricing per 1M tokens (May 2026)
 const PRO_INPUT_COST: f64 = 1.74;
@@ -53,7 +56,8 @@ async fn run_streaming_internal(
     config: &AgentConfig,
     tx: mpsc::UnboundedSender<StreamEvent>,
 ) -> anyhow::Result<AgentOutcome> {
-    let project_root = &config.project_root;
+    let scope = scope::resolve_task_scope(&config.project_root, task)?;
+    let project_root = &scope.active_root;
     let client = dsx_provider::client::DeepSeekClient::new_with_base(
         config.api_key.clone(),
         config.api_base.clone(),
@@ -78,7 +82,8 @@ async fn run_streaming_internal(
         Message {
             role: "system".into(),
             content: Some(format!(
-                "Current workspace project context:\n{}",
+                "{}\n\nCurrent workspace project context:\n{}",
+                scope.system_note(),
                 context_str
             )),
             tool_calls: None,
@@ -279,44 +284,4 @@ async fn run_streaming_internal(
         estimated_cost_usd: estimated_cost,
         tool_results: all_tool_results,
     })
-}
-
-fn summarize_tool_result(result: &ToolResult) -> String {
-    let mut summary: String = result.content.chars().take(300).collect();
-    if result.content.chars().count() > 300 {
-        summary.push_str("...");
-    }
-    summary
-}
-
-fn summarize_tool_results(results: &[ToolResult]) -> String {
-    if results.is_empty() {
-        return "none".into();
-    }
-
-    results
-        .iter()
-        .rev()
-        .take(3)
-        .map(|result| {
-            let status = if result.success { "ok" } else { "failed" };
-            let summary = summarize_tool_result(result);
-            format!("{}={}: {}", result.name, status, summary)
-        })
-        .collect::<Vec<_>>()
-        .join(" | ")
-}
-
-pub fn build_tool_defs() -> Vec<ToolDef> {
-    dsx_tools::ToolRegistry::builtin_specs()
-        .into_iter()
-        .map(|spec| ToolDef {
-            type_: "function".into(),
-            function: FunctionDef {
-                name: spec.name.clone(),
-                description: spec.description.clone(),
-                parameters: spec.parameters.clone(),
-            },
-        })
-        .collect()
 }

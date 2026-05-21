@@ -30,6 +30,7 @@ Rules:
 - Propose patches via propose_patch only for files you inspected.
 - Do not assume file contents; always verify with read_file.
 - Do not write directly outside the workspace.
+- Treat the active task scope as a hard boundary. If the user names a subfolder, only inspect and modify that subfolder unless they explicitly expand scope.
 - Respect the active permission mode.
 - Ask for approval before risky commands, destructive operations, network access, dependency installs, git reset/clean, or secrets-related actions.
 - Cite file paths and line ranges when possible.
