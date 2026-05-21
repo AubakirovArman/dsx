@@ -16,6 +16,7 @@ mod tests {
         assert!(!preflight.allowed());
         assert!(!preflight.narrowed);
         assert_eq!(preflight.policy_source, "container_guard");
+        assert_eq!(preflight.suggested_scopes, vec!["1234/", "other/"]);
         assert!(
             preflight
                 .reason
@@ -92,6 +93,7 @@ mod tests {
 
         assert!(text.contains("Agent preflight"));
         assert!(text.contains("Policy source: container_guard"));
+        assert!(text.contains("Suggested child scopes: 1234/"));
         assert!(text.contains("Decision: BLOCKED"));
         let _ = std::fs::remove_dir_all(root);
     }

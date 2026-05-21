@@ -87,6 +87,7 @@ mod tests {
         assert_eq!(app.input, "доработай проект");
         assert_eq!(app.active_run_id, None);
         assert_eq!(app.task_brief.done, "Task blocked before model call.");
+        assert!(app.task_brief.next_step.contains("1234/"));
         assert_eq!(app.scope_lock.status, "Blocked");
         assert!(app.scope_lock.warning.contains("No model call"));
         assert!(
@@ -104,6 +105,11 @@ mod tests {
             app.messages
                 .iter()
                 .any(|msg| msg.content.contains("Policy source: container_guard"))
+        );
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("Suggested child scopes: 1234/"))
         );
         let _ = std::fs::remove_dir_all(&root);
     }

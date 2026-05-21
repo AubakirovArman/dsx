@@ -15,7 +15,7 @@ pub(crate) fn block_if_needed(app: &mut dsx_tui::App, project_root: &Path, task:
         plan: "1. Pick an explicit child folder\n2. Retry the task or enable wide scope policy"
             .into(),
         last_changes: preflight.reason.clone(),
-        next_step: "Add a folder like ./1234, run preflight, or use --allow-wide-scope.".into(),
+        next_step: blocked_next_step(&preflight),
         active_scope: preflight.active.clone(),
     };
     app.scope_lock = dsx_tui::ScopeLockPanel {
@@ -27,4 +27,12 @@ pub(crate) fn block_if_needed(app: &mut dsx_tui::App, project_root: &Path, task:
     };
     app.add_message("system", &message);
     true
+}
+
+fn blocked_next_step(preflight: &crate::agent_preflight::AgentPreflight) -> String {
+    preflight
+        .suggested_scopes
+        .first()
+        .map(|scope| format!("Retry with explicit scope {scope}, run preflight, or allow wide."))
+        .unwrap_or_else(|| "Add an explicit child folder, run preflight, or allow wide.".into())
 }

@@ -10,6 +10,7 @@ pub(crate) struct AgentPreflight {
     pub(crate) active_exists: bool,
     pub(crate) allow_wide_scope: bool,
     pub(crate) policy_source: String,
+    pub(crate) suggested_scopes: Vec<String>,
     pub(crate) blocker: Option<String>,
     pub(crate) reason: String,
 }
@@ -83,6 +84,11 @@ pub(crate) fn build_agent_preflight(
     .map(str::to_string);
     let reason = decision_reason(scope.narrowed, allow_wide_scope, blocker.as_deref());
     let policy_source = policy_source(task, scope.narrowed, allow_wide_scope, blocker.as_deref());
+    let suggested_scopes = if blocker.is_some() {
+        suggested_child_scopes(project_root)
+    } else {
+        Vec::new()
+    };
     AgentPreflight {
         task: task_preview(task),
         launch: scope.launch_label,
@@ -91,6 +97,7 @@ pub(crate) fn build_agent_preflight(
         narrowed: scope.narrowed,
         allow_wide_scope,
         policy_source,
+        suggested_scopes,
         blocker,
         reason,
     }
@@ -108,8 +115,13 @@ pub(crate) fn render_text(preflight: &AgentPreflight) -> String {
     } else {
         "no"
     };
+    let suggested = if preflight.suggested_scopes.is_empty() {
+        "(none)".into()
+    } else {
+        preflight.suggested_scopes.join(", ")
+    };
     format!(
-        "Agent preflight:\n  Task: {}\n  Launch: {}\n  Active: {}\n  Scope: {}\n  Active exists: {}\n  Allow wide policy: {}\n  Policy source: {}\n  Decision: {}\n  Reason: {}\n",
+        "Agent preflight:\n  Task: {}\n  Launch: {}\n  Active: {}\n  Scope: {}\n  Active exists: {}\n  Allow wide policy: {}\n  Policy source: {}\n  Suggested child scopes: {}\n  Decision: {}\n  Reason: {}\n",
         preflight.task,
         preflight.launch,
         preflight.active,
@@ -117,6 +129,7 @@ pub(crate) fn render_text(preflight: &AgentPreflight) -> String {
         active_exists,
         allow_wide,
         preflight.policy_source,
+        suggested,
         preflight.decision().to_uppercase(),
         preflight.reason,
     )
@@ -131,11 +144,32 @@ fn render_json(preflight: &AgentPreflight) -> serde_json::Value {
         "active_exists": preflight.active_exists,
         "allow_wide_scope": preflight.allow_wide_scope,
         "policy_source": preflight.policy_source,
+        "suggested_scopes": preflight.suggested_scopes,
         "allowed": preflight.allowed(),
         "decision": preflight.decision(),
         "reason": preflight.reason,
         "blocker": preflight.blocker,
     })
+}
+
+fn suggested_child_scopes(project_root: &Path) -> Vec<String> {
+    let mut scopes = std::fs::read_dir(project_root)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.path().is_dir())
+                .filter_map(|entry| entry.file_name().to_str().map(|name| format!("{name}/")))
+                .filter(|name| !skip_suggested_scope(name))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    scopes.sort();
+    scopes.truncate(8);
+    scopes
+}
+
+fn skip_suggested_scope(name: &str) -> bool {
+    matches!(name, ".git/" | ".dsx/" | "target/" | "node_modules/") || name.starts_with('.')
 }
 
 fn policy_source(
