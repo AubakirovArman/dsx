@@ -95,6 +95,15 @@ pub enum WorkspaceAction {
         #[arg(long)]
         all: bool,
     },
+    /// Mark unfinished running run rows as stale across scopes
+    CloseStaleRuns {
+        /// Only close runs older than this many minutes
+        #[arg(long, default_value_t = 60)]
+        older_than_minutes: i64,
+        /// Count matching rows without updating them
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand, Clone)]

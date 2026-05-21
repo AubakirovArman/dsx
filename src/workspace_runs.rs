@@ -62,7 +62,7 @@ async fn count_running_rows(db_path: &Path) -> anyhow::Result<usize> {
     Ok(count.max(0) as usize)
 }
 
-fn discover_run_dbs(project_root: &Path) -> anyhow::Result<Vec<PathBuf>> {
+pub(crate) fn discover_run_dbs(project_root: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let mut dbs = Vec::new();
     visit(project_root, &mut dbs)?;
     dbs.sort();
@@ -133,8 +133,11 @@ fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
 }
 
 fn scope_label(project_root: &Path, located: &LocatedRun) -> String {
-    let db_scope = located
-        .db_path
+    scope_label_for_db(project_root, &located.db_path)
+}
+
+pub(crate) fn scope_label_for_db(project_root: &Path, db_path: &Path) -> String {
+    let db_scope = db_path
         .parent()
         .and_then(|path| path.parent())
         .unwrap_or(project_root);

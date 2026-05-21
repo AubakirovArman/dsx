@@ -19,6 +19,7 @@ pub mod tui_task;
 #[cfg(test)]
 mod tui_task_tests;
 pub mod workspace_runs;
+pub mod workspace_stale_runs;
 
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
@@ -27,6 +28,7 @@ use handlers::{
     run_mcp_list, run_plan, run_scope_preview, task_preview,
 };
 use workspace_runs::list_agent_runs;
+use workspace_stale_runs::close_stale_runs;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -180,6 +182,10 @@ async fn run_workspace_action(
         Some(WorkspaceAction::Runs { limit, all }) => {
             list_agent_runs(&project_root, limit, all).await
         }
+        Some(WorkspaceAction::CloseStaleRuns {
+            older_than_minutes,
+            dry_run,
+        }) => close_stale_runs(&project_root, older_than_minutes, dry_run).await,
         Some(WorkspaceAction::Resume { id }) => {
             let Some(key) = require_api_key(api_key) else {
                 return Ok(());
