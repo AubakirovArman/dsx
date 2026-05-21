@@ -22,6 +22,7 @@ impl DeepSeekClient {
         }
         let req_client = Client::builder()
             .connect_timeout(std::time::Duration::from_secs(10))
+            .read_timeout(std::time::Duration::from_secs(45))
             .build()
             .unwrap_or_else(|_| Client::new());
         Self {
@@ -31,21 +32,48 @@ impl DeepSeekClient {
         }
     }
 
-    /// Send a non-streaming chat request.
+    /// Send a non-streaming chat request with exponential backoff auto-retry.
     pub async fn chat(&self, request: &ChatRequest) -> anyhow::Result<String> {
         let url = format!("{}/v1/chat/completions", self.base_url);
-        let resp = self.client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(request)
-            .timeout(std::time::Duration::from_secs(12))
-            .send()
-            .await?;
-        let text = resp.text().await?;
-        Ok(text)
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut last_err = anyhow::anyhow!("Unknown error");
+
+        while attempts < max_attempts {
+            attempts += 1;
+            match self.client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .json(request)
+                .timeout(std::time::Duration::from_secs(12))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        if let Ok(text) = resp.text().await {
+                            return Ok(text);
+                        }
+                    } else {
+                        let status_code = status.as_u16();
+                        let body = resp.text().await.unwrap_or_default();
+                        last_err = anyhow::anyhow!("API error {}: {}", status_code, body);
+                    }
+                }
+                Err(e) => {
+                    last_err = e.into();
+                }
+            }
+
+            if attempts < max_attempts {
+                tokio::time::sleep(std::time::Duration::from_secs(attempts)).await;
+            }
+        }
+        Err(last_err)
     }
 
-    /// Stream a chat completion and parse SSE events.
+    /// Stream a chat completion and parse SSE events with automatic retry.
     pub async fn chat_stream_events(
         &self,
         request: &ChatRequest,
@@ -53,27 +81,51 @@ impl DeepSeekClient {
         let mut req = request.clone();
         req.stream = Some(true);
         let url = format!("{}/v1/chat/completions", self.base_url);
-        let resp = self.client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&req)
-            .send()
-            .await?;
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut last_err = anyhow::anyhow!("Unknown streaming error");
 
-        let status = resp.status();
-        if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("API error {}: {body}", status.as_u16());
+        while attempts < max_attempts {
+            attempts += 1;
+            match self.client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .json(&req)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        match parse_sse_stream(resp).await {
+                            Ok(evs) => return Ok(evs),
+                            Err(e) => {
+                                last_err = e;
+                            }
+                        }
+                    } else {
+                        let status_code = status.as_u16();
+                        let body = resp.text().await.unwrap_or_default();
+                        last_err = anyhow::anyhow!("API error {}: {}", status_code, body);
+                    }
+                }
+                Err(e) => {
+                    last_err = e.into();
+                }
+            }
+
+            if attempts < max_attempts {
+                tokio::time::sleep(std::time::Duration::from_secs(attempts)).await;
+            }
         }
-        tracing::debug!(status = %status, "Streaming response received");
-        parse_sse_stream(resp).await
+        Err(last_err)
     }
 
-    /// Stream a chat completion and call `on_event` for each parsed event in real-time.
+    /// Stream a chat completion with exponential backoff auto-retry and real-time user-facing notifications.
     pub async fn chat_stream_callback<F>(
         &self,
         request: &ChatRequest,
-        on_event: F,
+        mut on_event: F,
     ) -> anyhow::Result<()>
     where
         F: FnMut(StreamEvent),
@@ -81,18 +133,49 @@ impl DeepSeekClient {
         let mut req = request.clone();
         req.stream = Some(true);
         let url = format!("{}/v1/chat/completions", self.base_url);
-        let resp = self.client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&req)
-            .send()
-            .await?;
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut last_err = anyhow::anyhow!("Unknown streaming callback error");
 
-        let status = resp.status();
-        if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("API error {}: {body}", status.as_u16());
+        while attempts < max_attempts {
+            attempts += 1;
+            match self.client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .json(&req)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        match parse_sse_stream_callback(resp, &mut on_event).await {
+                            Ok(()) => return Ok(()),
+                            Err(e) => {
+                                last_err = e;
+                            }
+                        }
+                    } else {
+                        let status_code = status.as_u16();
+                        let body = resp.text().await.unwrap_or_default();
+                        last_err = anyhow::anyhow!("API error {}: {}", status_code, body);
+                    }
+                }
+                Err(e) => {
+                    last_err = e.into();
+                }
+            }
+
+            if attempts < max_attempts {
+                let msg = match attempts {
+                    1 => "⚠️ [Сетевой сбой. Переподключение к API через 1 секунду...]\n",
+                    2 => "⚠️ [Сервер перегружен. Вторая попытка переподключения через 2 секунды...]\n",
+                    _ => "⚠️ [Задержка сети. Финальная попытка подключения через 3 секунды...]\n",
+                };
+                on_event(StreamEvent::Reasoning(msg.to_string()));
+                tokio::time::sleep(std::time::Duration::from_secs(attempts)).await;
+            }
         }
-        parse_sse_stream_callback(resp, on_event).await
+        Err(last_err)
     }
 }
