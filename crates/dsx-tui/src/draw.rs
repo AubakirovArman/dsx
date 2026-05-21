@@ -29,12 +29,15 @@ impl App {
 
         let top = main[0];
 
+        let show_reasoning = !self.current_reasoning.is_empty()
+            || (self.model == "v4-pro" && match self.agent_task { crate::types::AgentTask::Running(_) => true, _ => false });
+
         let mut horizontal_constraints = Vec::new();
         if self.show_file_tree && !self.file_tree.is_empty() {
             horizontal_constraints.push(Constraint::Percentage(20));
         }
         horizontal_constraints.push(Constraint::Min(40));
-        if !self.current_reasoning.is_empty() {
+        if show_reasoning {
             horizontal_constraints.push(Constraint::Percentage(33));
         }
 
@@ -53,7 +56,7 @@ impl App {
         let main_workspace_area = panes[pane_idx];
         pane_idx += 1;
 
-        if !self.current_reasoning.is_empty() {
+        if show_reasoning {
             self.draw_reasoning(frame, panes[pane_idx]);
         }
 
@@ -118,6 +121,34 @@ impl App {
         for line in self.current_reasoning.lines() {
             lines.push(Line::from(vec![
                 Span::styled(line, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
+            ]));
+        }
+
+        if lines.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled(match self.lang {
+                    crate::types::Language::Russian => "  ⟳ Соединение установлено...",
+                    crate::types::Language::Kazakh => "  ⟳ Байланыс орнатылды...",
+                    crate::types::Language::Chinese => "  ⟳ API 握手成功...",
+                    crate::types::Language::English => "  ⟳ Handshake established...",
+                }, Style::default().fg(Color::LightMagenta).add_modifier(Modifier::BOLD))
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled(match self.lang {
+                    crate::types::Language::Russian => "  ⌛ Обработка промпта в очереди...",
+                    crate::types::Language::Kazakh => "  ⌛ Кезекті өңдеу жүріп жатыр...",
+                    crate::types::Language::Chinese => "  ⌛ 正在排队并处理提示词上下文...",
+                    crate::types::Language::English => "  ⌛ Processing prompt & queuing...",
+                }, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled(match self.lang {
+                    crate::types::Language::Russian => "  ⚡ Пожалуйста, подождите (v4-pro)...",
+                    crate::types::Language::Kazakh => "  ⚡ Күте тұрыңыз (v4-pro)...",
+                    crate::types::Language::Chinese => "  ⚡ 请稍后 (v4-pro)...",
+                    crate::types::Language::English => "  ⚡ Please wait (v4-pro)...",
+                }, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
             ]));
         }
 
