@@ -98,6 +98,10 @@ pub fn format_limits(limits: BudgetLimits) -> String {
     )
 }
 
+pub fn estimate_run_cost(model_name: &str, usage: RunUsage) -> f64 {
+    estimate_cost(model_name, usage.prompt_tokens, usage.completion_tokens)
+}
+
 pub fn estimate_request_tokens(request: &ChatRequest) -> anyhow::Result<u64> {
     let bytes = serde_json::to_vec(request)?.len() as u64;
     Ok((bytes / 4).max(1))

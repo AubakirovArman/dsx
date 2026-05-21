@@ -9,6 +9,7 @@ pub mod tool_defs;
 pub mod tool_executor;
 pub mod tool_executor_tests;
 pub mod tool_implementations;
+pub mod transcript;
 pub mod types;
 
 pub use classify::{classify, heuristic_classify};
@@ -22,12 +23,6 @@ use dsx_provider::types::{
 };
 use tokio::sync::mpsc;
 use tool_defs::{compact_tool_content, summarize_tool_result, summarize_tool_results};
-
-// Pricing per 1M tokens (May 2026)
-const PRO_INPUT_COST: f64 = 1.74;
-const PRO_OUTPUT_COST: f64 = 3.48;
-const FLASH_INPUT_COST: f64 = 0.14;
-const FLASH_OUTPUT_COST: f64 = 0.28;
 
 /// ReAct agent loop with streaming events sent to the TUI via `tx`.
 /// Wraps execution to capture and send any startup or API errors to the TUI defensively.
@@ -267,6 +262,7 @@ async fn run_streaming_internal(
             break;
         }
         messages.extend(tool_msgs);
+        transcript::compact_messages(&mut messages, &all_tool_results);
     }
 
     if final_answer.is_none() {
@@ -277,14 +273,8 @@ async fn run_streaming_internal(
         ));
     }
 
-    let is_pro = model_name.contains("pro");
-    let (input_cost_per_m, output_cost_per_m) = if is_pro {
-        (PRO_INPUT_COST, PRO_OUTPUT_COST)
-    } else {
-        (FLASH_INPUT_COST, FLASH_OUTPUT_COST)
-    };
-    let estimated_cost = (total_prompt as f64 / 1_000_000.0) * input_cost_per_m
-        + (total_completion as f64 / 1_000_000.0) * output_cost_per_m;
+    let usage = budget::RunUsage::new(total_prompt, total_completion, total_reasoning);
+    let estimated_cost = budget::estimate_run_cost(model_name, usage);
 
     Ok(AgentOutcome {
         answer: final_answer,
