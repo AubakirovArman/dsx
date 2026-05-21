@@ -7,6 +7,7 @@ pub mod draw_chat;
 pub mod draw_input;
 pub mod draw_settings;
 pub mod draw_status;
+pub mod draw_tools;
 pub mod draw_workflow;
 pub mod folder_notes;
 pub mod i18n;
@@ -38,6 +39,7 @@ pub struct App {
     pub show_settings: bool,
     pub settings_cursor: usize,
     pub show_diff: bool,
+    pub show_tools: bool,
     pub current_diff: String,
     pub lang: Language,
     pub api_base: String,
@@ -99,6 +101,7 @@ impl App {
             show_settings: false,
             settings_cursor: 0,
             show_diff: false,
+            show_tools: false,
             current_diff: String::new(),
             lang: initial_lang,
             api_base: "https://api.deepseek.com".to_string(),

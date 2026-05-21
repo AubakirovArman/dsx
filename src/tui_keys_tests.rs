@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_keys::active_scope_path;
+    use crate::tui_keys::{active_scope_path, toggle_settings, toggle_tools};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -20,5 +20,29 @@ mod tests {
         let app = Arc::new(Mutex::new(dsx_tui::App::new()));
 
         assert_eq!(active_scope_path(&app, launch), launch);
+    }
+
+    #[test]
+    fn tools_view_toggle_hides_other_modal_views() {
+        let mut app = dsx_tui::App::new();
+        app.show_diff = true;
+        app.show_settings = true;
+
+        toggle_tools(&mut app);
+
+        assert!(app.show_tools);
+        assert!(!app.show_diff);
+        assert!(!app.show_settings);
+    }
+
+    #[test]
+    fn settings_toggle_hides_tools_view() {
+        let mut app = dsx_tui::App::new();
+        app.show_tools = true;
+
+        toggle_settings(&mut app);
+
+        assert!(app.show_settings);
+        assert!(!app.show_tools);
     }
 }

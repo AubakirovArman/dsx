@@ -1,0 +1,128 @@
+//! Dedicated tool timeline view.
+
+use crate::App;
+use ratatui::{
+    Frame,
+    layout::Rect,
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+};
+
+impl App {
+    pub fn draw_tools(&self, frame: &mut Frame, area: Rect) {
+        let mut lines: Vec<Line<'static>> = vec![
+            Line::from(vec![
+                Span::styled("Active scope: ", Style::default().fg(Color::LightCyan)),
+                Span::styled(
+                    scope_text(&self.scope_lock.active_scope).to_string(),
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Scope guard: ", Style::default().fg(scope_color(self))),
+                Span::styled(scope_guard_text(self), Style::default().fg(Color::White)),
+            ]),
+            Line::from(""),
+        ];
+        if self.compaction_events > 0 {
+            lines.push(compaction_line(self));
+            lines.push(Line::from(""));
+        }
+        if self.tool_timeline.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                "No tool calls in this task yet.",
+                Style::default().fg(Color::DarkGray),
+            )]));
+        } else {
+            append_tools(self, &mut lines);
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Yellow))
+                    .title(Span::styled(
+                        " Tools / Scope Guard ",
+                        Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
+                    )),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, area);
+    }
+}
+
+fn append_tools(app: &App, lines: &mut Vec<Line<'static>>) {
+    for (idx, entry) in app.tool_timeline.iter().rev().take(20).rev().enumerate() {
+        let color = status_color(&entry.status);
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{:02} ", idx + 1),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                format!("{:<7}", entry.status),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+            Span::styled(entry.name.clone(), Style::default().fg(Color::LightYellow)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("   "),
+            Span::styled(entry.summary.clone(), Style::default().fg(Color::Gray)),
+        ]));
+    }
+}
+
+fn compaction_line(app: &App) -> Line<'static> {
+    Line::from(vec![
+        Span::styled("compact ", Style::default().fg(Color::LightCyan)),
+        Span::styled(
+            format!(
+                "{} event(s), {} msg, ~{} tok saved",
+                app.compaction_events, app.compacted_messages, app.estimated_tokens_saved
+            ),
+            Style::default().fg(Color::Gray),
+        ),
+    ])
+}
+
+fn status_color(status: &str) -> Color {
+    match status {
+        "ok" => Color::LightGreen,
+        "blocked" => Color::LightRed,
+        "failed" => Color::LightRed,
+        _ => Color::White,
+    }
+}
+
+fn scope_color(app: &App) -> Color {
+    if app.scope_violations > 0 {
+        Color::LightRed
+    } else {
+        Color::LightGreen
+    }
+}
+
+fn scope_guard_text(app: &App) -> String {
+    if app.scope_violations == 0 {
+        return "0 blocked escape(s)".into();
+    }
+    format!(
+        "{} blocked escape(s); last: {}",
+        app.scope_violations, app.last_scope_violation
+    )
+}
+
+fn scope_text(scope: &str) -> &str {
+    if scope.trim().is_empty() {
+        "(none)"
+    } else {
+        scope
+    }
+}

@@ -52,6 +52,8 @@ impl App {
             ]);
         } else if self.show_settings {
             spans.extend(settings_keys(self.lang));
+        } else if self.show_tools {
+            spans.extend(tools_keys(self.lang));
         } else if area.width >= 110 {
             spans.extend([
                 plain(" | model: "),
@@ -160,6 +162,21 @@ fn settings_keys(lang: Language) -> Vec<Span<'static>> {
     ]
 }
 
+fn tools_keys(lang: Language) -> Vec<Span<'static>> {
+    vec![
+        plain(" | "),
+        key("Esc"),
+        plain(match lang {
+            Language::Russian => ":закрыть ",
+            Language::Kazakh => ":жабу ",
+            Language::Chinese => ":关闭 ",
+            Language::English => ":close ",
+        }),
+        key("Ctrl+L"),
+        plain(":tools "),
+    ]
+}
+
 fn main_keys(lang: Language, include_tree: bool, include_stop: bool) -> Vec<Span<'static>> {
     let mut spans = vec![key("Ctrl+S"), plain(tr(lang, "status_settings_toggle"))];
     if include_tree {
@@ -171,6 +188,8 @@ fn main_keys(lang: Language, include_tree: bool, include_stop: bool) -> Vec<Span
     spans.extend([
         key("Ctrl+D"),
         plain(tr(lang, "status_diff_toggle")),
+        key("Ctrl+L"),
+        plain(":tools "),
         key("Ctrl+U"),
         plain(tr(lang, "status_undo_toggle")),
     ]);

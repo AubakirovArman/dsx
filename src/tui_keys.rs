@@ -36,8 +36,9 @@ pub async fn handle_key(
             Ok(KeyOutcome::Continue)
         }
         KeyCode::Char('t') if ctrl(key) => toggle(app, |a| a.show_file_tree = !a.show_file_tree),
-        KeyCode::Char('s') if ctrl(key) => toggle(app, |a| a.show_settings = !a.show_settings),
+        KeyCode::Char('s') if ctrl(key) => toggle(app, toggle_settings),
         KeyCode::Char('d') if ctrl(key) => toggle_diff(app, project_root),
+        KeyCode::Char('l') if ctrl(key) => toggle(app, toggle_tools),
         KeyCode::Char('u') if ctrl(key) => rollback(app, project_root),
         KeyCode::Up => scroll(app, 1),
         KeyCode::Down => scroll(app, -1),
@@ -59,10 +60,28 @@ fn handle_modal_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> Option<KeyOu
     if app.lock().unwrap().show_diff {
         return Some(handle_diff_key(key, app));
     }
+    if app.lock().unwrap().show_tools {
+        return Some(handle_tools_key(key, app));
+    }
     if app.lock().unwrap().show_settings {
         return Some(crate::tui_settings_keys::handle_settings_key(app, key));
     }
     None
+}
+
+fn handle_tools_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
+    match key.code {
+        KeyCode::Esc => {
+            app.lock().unwrap().show_tools = false;
+            KeyOutcome::Continue
+        }
+        KeyCode::Char('l') if ctrl(key) => {
+            app.lock().unwrap().show_tools = false;
+            KeyOutcome::Continue
+        }
+        KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,
+        _ => KeyOutcome::Continue,
+    }
 }
 
 fn handle_approval_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> KeyOutcome {
@@ -117,12 +136,30 @@ fn toggle(app: &SharedApp, f: impl FnOnce(&mut dsx_tui::App)) -> anyhow::Result<
     Ok(KeyOutcome::Continue)
 }
 
+pub(crate) fn toggle_settings(app: &mut dsx_tui::App) {
+    app.show_settings = !app.show_settings;
+    if app.show_settings {
+        app.show_diff = false;
+        app.show_tools = false;
+    }
+}
+
+pub(crate) fn toggle_tools(app: &mut dsx_tui::App) {
+    app.show_tools = !app.show_tools;
+    if app.show_tools {
+        app.show_diff = false;
+        app.show_settings = false;
+    }
+}
+
 fn toggle_diff(app: &SharedApp, project_root: &Path) -> anyhow::Result<KeyOutcome> {
     let scope = active_scope_path(app, project_root);
     let mut app = app.lock().unwrap();
     if !app.show_diff {
         app.current_diff =
             dsx_git::diff(&scope).unwrap_or_else(|_| "Error: Failed to fetch git diff.".into());
+        app.show_settings = false;
+        app.show_tools = false;
     }
     app.show_diff = !app.show_diff;
     Ok(KeyOutcome::Continue)
