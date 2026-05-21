@@ -93,7 +93,11 @@ fn note_from_scope(
         plan: field(summary, |s| &s.plan, "No saved plan yet."),
         last_changes: field(summary, |s| &s.last_changes, fallback_last(scope)),
         next_step: field(summary, |s| &s.next_step, "No saved next step yet."),
-        architecture: field(summary, |s| &s.architecture, fallback_arch(scope)),
+        architecture: field(
+            summary,
+            |s| &s.architecture,
+            fallback_arch(project_root, scope),
+        ),
     }
 }
 
@@ -168,7 +172,10 @@ fn fallback_last(scope: &Path) -> String {
     format!("{} direct item(s) visible.", direct_item_count(scope))
 }
 
-fn fallback_arch(scope: &Path) -> String {
+fn fallback_arch(project_root: &Path, scope: &Path) -> String {
+    if scope == project_root {
+        return "./: launch workspace; open child folders only when task-relevant".into();
+    }
     let name = scope
         .file_name()
         .and_then(|name| name.to_str())

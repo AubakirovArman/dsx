@@ -6,6 +6,9 @@ mod agent_preflight_tests;
 pub mod cli;
 #[cfg(test)]
 mod cli_tests;
+pub mod context_capsule;
+#[cfg(test)]
+mod context_capsule_tests;
 pub mod context_preview;
 #[cfg(test)]
 mod context_preview_tests;
@@ -42,6 +45,7 @@ pub mod workspace_stale_runs;
 use agent_preflight::run_agent_preflight;
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
+use context_capsule::run_context_capsule;
 use context_preview::run_context_preview;
 use handlers::{
     list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
@@ -118,6 +122,10 @@ async fn main() -> anyhow::Result<()> {
         }) => {
             let desc = task.join(" ");
             run_context_preview(&project_root, &desc, json, check, require_narrow).await?;
+        }
+        Some(Command::Capsule { task, limit, json }) => {
+            let desc = task.join(" ");
+            run_context_capsule(&project_root, &desc, limit, json).await?;
         }
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,

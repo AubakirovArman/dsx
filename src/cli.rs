@@ -88,6 +88,18 @@ pub enum Command {
         #[arg(long)]
         require_narrow: bool,
     },
+    /// Show the compact state capsule that should replace long chat history
+    Capsule {
+        /// Task text to resolve and summarize into a compact capsule
+        #[arg(required = true)]
+        task: Vec<String>,
+        /// Maximum launch/child scopes to include in folder notes
+        #[arg(short, long, default_value_t = 12)]
+        limit: u32,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Build or query the local code index
     Index {
         #[command(subcommand)]

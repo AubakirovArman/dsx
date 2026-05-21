@@ -27,4 +27,18 @@ mod tests {
         assert!(json);
         assert!(check);
     }
+
+    #[test]
+    fn parses_capsule_json_limit_flags() {
+        let cli =
+            CliArgs::try_parse_from(["dsx", "capsule", "--json", "--limit", "3", "почини", "1234"])
+                .unwrap();
+
+        let Some(Command::Capsule { task, limit, json }) = cli.command else {
+            panic!("expected capsule command");
+        };
+        assert_eq!(task, vec!["почини".to_string(), "1234".to_string()]);
+        assert_eq!(limit, 3);
+        assert!(json);
+    }
 }
