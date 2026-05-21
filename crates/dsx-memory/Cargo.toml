@@ -1,0 +1,16 @@
+[package]
+name = "dsx-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX SQLite memory store: sessions, usage, summaries, patches, checkpoints"
+
+[dependencies]
+dsx-core.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+anyhow.workspace = true

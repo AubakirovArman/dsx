@@ -1,0 +1,6 @@
+# Clippy configuration for DSX Code
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 8
+
+# Allow unwrap in tests
+allow-unwrap-in-tests = true

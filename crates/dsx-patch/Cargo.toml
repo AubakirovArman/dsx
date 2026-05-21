@@ -1,0 +1,12 @@
+[package]
+name = "dsx-patch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX SEARCH/REPLACE patch engine with 4-tier matching"
+
+[dependencies]
+dsx-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

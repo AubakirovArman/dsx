@@ -1,0 +1,10 @@
+[package]
+name = "dsx-permissions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX permission engine with 5-level risk classifier"
+
+[dependencies]
+dsx-core.workspace = true
+serde.workspace = true

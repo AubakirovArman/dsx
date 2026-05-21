@@ -1,0 +1,11 @@
+[package]
+name = "dsx-telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX telemetry: local audit log and usage meter"
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true

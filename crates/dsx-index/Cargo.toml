@@ -1,0 +1,14 @@
+[package]
+name = "dsx-index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX codebase index: tree-sitter symbols, tantivy full-text search"
+
+[dependencies]
+ignore.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+sqlx = { workspace = true, features = ["runtime-tokio", "tls-rustls"] }
+tokio = { workspace = true, features = ["full"] }
+uuid = { workspace = true, features = ["v4"] }

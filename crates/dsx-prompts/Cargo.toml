@@ -1,0 +1,10 @@
+[package]
+name = "dsx-prompts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX prompt builder: 6 specialized system prompts for agent roles"
+
+[dependencies]
+dsx-core.workspace = true
+anyhow.workspace = true

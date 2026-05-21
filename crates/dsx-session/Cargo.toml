@@ -1,0 +1,17 @@
+[package]
+name = "dsx-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX session manager: create, persist, resume"
+
+[dependencies]
+dsx-core.workspace = true
+dsx-memory.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+anyhow.workspace = true

@@ -1,0 +1,6 @@
+# Rustfmt configuration for DSX Code
+edition = "2024"
+max_width = 100
+tab_spaces = 4
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"

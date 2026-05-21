@@ -1,0 +1,154 @@
+[package]
+name = "dsx"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/deepseek-code/dsx"
+rust-version = "1.85"
+
+[[bin]]
+name = "dsx"
+path = "src/main.rs"
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/dsx-core",
+    "crates/dsx-tui",
+    "crates/dsx-agent",
+    "crates/dsx-provider",
+    "crates/dsx-config",
+    "crates/dsx-tools",
+    "crates/dsx-patch",
+    "crates/dsx-permissions",
+    "crates/dsx-git",
+    "crates/dsx-fs",
+    "crates/dsx-sandbox",
+    "crates/dsx-memory",
+    "crates/dsx-session",
+    "crates/dsx-context",
+    "crates/dsx-index",
+    "crates/dsx-prompts",
+    "crates/dsx-mcp",
+    "crates/dsx-eval",
+    "crates/dsx-telemetry",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/deepseek-code/dsx"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# TUI
+ratatui = "0.30"
+crossterm = "0.29"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+futures-util = "0.3"
+bytes = "1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Config
+toml = "0.8"
+dirs = "6"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Git
+git2 = "0.19"
+gix = "0.70"
+
+# File system / ignore
+ignore = "0.4"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+
+# Patches / diffs
+similar = "2"
+diffy = "0.4"
+
+# Indexing
+tree-sitter = "0.24"
+tantivy = "0.22"
+
+# MCP / JSON-RPC
+jsonrpsee = { version = "0.24", features = ["client", "server"] }
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# UUID
+uuid = { version = "1", features = ["v4"] }
+
+# Chrono
+chrono = { version = "0.4", features = ["serde"] }
+
+# Internal crates
+dsx-core = { path = "crates/dsx-core" }
+dsx-config = { path = "crates/dsx-config" }
+dsx-provider = { path = "crates/dsx-provider" }
+dsx-agent = { path = "crates/dsx-agent" }
+dsx-tools = { path = "crates/dsx-tools" }
+dsx-patch = { path = "crates/dsx-patch" }
+dsx-permissions = { path = "crates/dsx-permissions" }
+dsx-git = { path = "crates/dsx-git" }
+dsx-fs = { path = "crates/dsx-fs" }
+dsx-sandbox = { path = "crates/dsx-sandbox" }
+dsx-memory = { path = "crates/dsx-memory" }
+dsx-session = { path = "crates/dsx-session" }
+dsx-context = { path = "crates/dsx-context" }
+dsx-index = { path = "crates/dsx-index" }
+dsx-prompts = { path = "crates/dsx-prompts" }
+dsx-tui = { path = "crates/dsx-tui" }
+dsx-mcp = { path = "crates/dsx-mcp" }
+dsx-eval = { path = "crates/dsx-eval" }
+dsx-telemetry = { path = "crates/dsx-telemetry" }
+
+# --- Dependencies for the root package (dsx binary) ---
+
+[dependencies]
+dsx-core.workspace = true
+dsx-config.workspace = true
+dsx-provider.workspace = true
+dsx-agent.workspace = true
+dsx-tools.workspace = true
+dsx-patch.workspace = true
+dsx-permissions.workspace = true
+dsx-git.workspace = true
+dsx-fs.workspace = true
+dsx-sandbox.workspace = true
+dsx-memory.workspace = true
+dsx-session.workspace = true
+dsx-context.workspace = true
+dsx-index.workspace = true
+dsx-prompts.workspace = true
+dsx-tui.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+dsx-mcp.workspace = true
+dsx-eval.workspace = true
+dsx-telemetry.workspace = true
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true

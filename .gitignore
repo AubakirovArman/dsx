@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+
+# Local SQLite sessions database
+/.dsx
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environmental configurations
+.env
+*.pem
+*.key

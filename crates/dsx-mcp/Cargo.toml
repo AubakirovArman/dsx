@@ -1,0 +1,12 @@
+[package]
+name = "dsx-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX MCP client: Model Context Protocol stdio/HTTP transports"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

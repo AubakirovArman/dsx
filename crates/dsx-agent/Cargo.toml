@@ -1,0 +1,24 @@
+[package]
+name = "dsx-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX agent loop: ReAct-based orchestration with Pro/Flash routing"
+
+[dependencies]
+dsx-core.workspace = true
+dsx-provider.workspace = true
+dsx-fs.workspace = true
+dsx-tools.workspace = true
+dsx-patch.workspace = true
+ignore.workspace = true
+dsx-permissions.workspace = true
+dsx-context.workspace = true
+dsx-git.workspace = true
+dsx-sandbox.workspace = true
+dsx-prompts.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+anyhow.workspace = true

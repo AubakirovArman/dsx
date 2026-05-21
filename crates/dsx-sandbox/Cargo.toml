@@ -1,0 +1,10 @@
+[package]
+name = "dsx-sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX command sandbox: classified command execution with timeout"
+
+[dependencies]
+tokio.workspace = true
+anyhow.workspace = true

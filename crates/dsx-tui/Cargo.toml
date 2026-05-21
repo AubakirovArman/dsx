@@ -1,0 +1,13 @@
+[package]
+name = "dsx-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DSX TUI: ratatui-based terminal workspace"
+
+[dependencies]
+dsx-core.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
