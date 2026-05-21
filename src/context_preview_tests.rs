@@ -62,6 +62,12 @@ mod tests {
         );
         assert!(value["task_brief"].as_str().unwrap().contains("Goal:"));
         assert!(
+            value["context_capsule"]
+                .as_str()
+                .unwrap()
+                .contains("previous chat history")
+        );
+        assert!(
             value["project_context"]
                 .as_str()
                 .unwrap()

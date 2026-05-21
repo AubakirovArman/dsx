@@ -133,7 +133,10 @@ fn print_preview(preview: &ContextPreview) {
         preview.metrics.project_instructions_chars
     );
     println!("\nSystem scope note:\n{}\n", preview.system_note);
-    println!("Compact task brief:\n{}\n", preview.task_brief);
+    println!(
+        "Context capsule:\n{}\n",
+        dsx_agent::prompt::context_capsule(&preview.task_brief)
+    );
     if let Some(instructions) = &preview.project_instructions {
         println!("Project-specific instructions:\n{}\n", instructions);
     }
@@ -150,6 +153,7 @@ pub(crate) fn preview_json(preview: &ContextPreview) -> serde_json::Value {
         "active_exists": preview.active_exists,
         "system_note": preview.system_note,
         "task_brief": preview.task_brief,
+        "context_capsule": dsx_agent::prompt::context_capsule(&preview.task_brief),
         "project_instructions": preview.project_instructions,
         "project_context": preview.project_context,
         "metrics": {
@@ -228,21 +232,14 @@ fn estimate_start_request_tokens(
 ) -> anyhow::Result<u64> {
     use dsx_provider::types::ChatRequest;
 
-    let mut messages = vec![
-        msg("system", dsx_prompts::lead_agent()),
-        msg(
-            "system",
-            format!("{system_note}\n\nCurrent workspace project context:\n{project_context}"),
-        ),
-        msg("system", task_brief),
-    ];
-    if let Some(instructions) = project_instructions {
-        messages.push(msg(
-            "system",
-            format!("Project-specific instructions:\n{instructions}"),
-        ));
-    }
-    messages.push(msg("user", clean_task));
+    let messages = dsx_agent::prompt::build_start_messages(
+        dsx_prompts::lead_agent(),
+        system_note,
+        project_context,
+        task_brief,
+        project_instructions,
+        clean_task,
+    );
 
     let request = ChatRequest {
         model: "deepseek-v4-pro".into(),
@@ -255,14 +252,4 @@ fn estimate_start_request_tokens(
         stream_options: None,
     };
     dsx_agent::budget::estimate_request_tokens(&request)
-}
-
-fn msg(role: &str, content: impl Into<String>) -> dsx_provider::types::Message {
-    dsx_provider::types::Message {
-        role: role.into(),
-        content: Some(content.into()),
-        tool_calls: None,
-        tool_call_id: None,
-        reasoning_content: None,
-    }
 }

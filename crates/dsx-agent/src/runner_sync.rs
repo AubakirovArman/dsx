@@ -36,52 +36,15 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
     // Step 4: Set up the conversation
     let tools = build_tool_defs();
     let (model_name, thinking, effort) = dsx_provider::model_config(route);
-
-    let mut messages: Vec<Message> = vec![
-        Message {
-            role: "system".into(),
-            content: Some(system_prompt),
-            tool_calls: None,
-            tool_call_id: None,
-            reasoning_content: None,
-        },
-        Message {
-            role: "system".into(),
-            content: Some(format!(
-                "{}\n\nCurrent workspace project context:\n{}",
-                scope.system_note(),
-                context_str
-            )),
-            tool_calls: None,
-            tool_call_id: None,
-            reasoning_content: None,
-        },
-        Message {
-            role: "system".into(),
-            content: Some(task_brief.clone()),
-            tool_calls: None,
-            tool_call_id: None,
-            reasoning_content: None,
-        },
-    ];
-
-    if let Some(instructions) = dsx_context::load_project_instructions(project_root) {
-        messages.push(Message {
-            role: "system".into(),
-            content: Some(format!("Project-specific instructions:\n{}", instructions)),
-            tool_calls: None,
-            tool_call_id: None,
-            reasoning_content: None,
-        });
-    }
-
-    messages.push(Message {
-        role: "user".into(),
-        content: Some(clean_task),
-        tool_calls: None,
-        tool_call_id: None,
-        reasoning_content: None,
-    });
+    let project_instructions = dsx_context::load_project_instructions(project_root);
+    let mut messages = crate::prompt::build_start_messages(
+        system_prompt,
+        &scope.system_note(),
+        &context_str,
+        &task_brief,
+        project_instructions.as_deref(),
+        &clean_task,
+    );
 
     // Token tracking
     let mut total_prompt_tokens: u64 = 0;
