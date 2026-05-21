@@ -51,6 +51,12 @@ pub enum Command {
     },
     /// Diagnose workspace readiness and local safety invariants
     Doctor,
+    /// Preview the active task scope without calling the model
+    Scope {
+        /// Task text to resolve against the launch workspace
+        #[arg(required = true)]
+        task: Vec<String>,
+    },
     /// Build or query the local code index
     Index {
         #[command(subcommand)]

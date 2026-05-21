@@ -7,6 +7,8 @@ pub mod handlers;
 pub mod run_ledger;
 pub mod session_state;
 pub mod task_scope;
+#[cfg(test)]
+mod task_scope_tests;
 pub mod tui_keys;
 pub mod tui_runner;
 pub mod tui_settings_keys;
@@ -21,7 +23,7 @@ use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
 use handlers::{
     list_agent_runs, list_sessions, run_edit, run_eval, run_index_build, run_index_search,
-    run_mcp_call, run_mcp_list, run_plan, task_preview,
+    run_mcp_call, run_mcp_list, run_plan, run_scope_preview, task_preview,
 };
 
 #[tokio::main]
@@ -72,6 +74,10 @@ async fn main() -> anyhow::Result<()> {
         }) => run_eval(project_root, api_key, api_base, tasks_file, mode, no_agent).await?,
         Some(Command::Doctor) => {
             doctor::run_doctor(&project_root, &api_base, api_key.as_deref()).await?
+        }
+        Some(Command::Scope { task }) => {
+            let desc = task.join(" ");
+            run_scope_preview(&project_root, &desc);
         }
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,
