@@ -3,11 +3,11 @@
 use crate::App;
 use crate::i18n::tr;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
-    Frame,
 };
 
 impl App {
@@ -30,7 +30,8 @@ impl App {
         let top = main[0];
 
         let show_reasoning = !self.current_reasoning.is_empty()
-            || (self.model == "v4-pro" && match self.agent_task { crate::types::AgentTask::Running(_) => true, _ => false });
+            || (self.model == "v4-pro"
+                && matches!(self.agent_task, crate::types::AgentTask::Running(_)));
 
         let mut horizontal_constraints = Vec::new();
         if self.show_file_tree && !self.file_tree.is_empty() {
@@ -75,31 +76,38 @@ impl App {
     fn draw_file_tree(&self, frame: &mut Frame, area: Rect) {
         let height = area.height.saturating_sub(3) as usize; // reserve space for title/borders and "+N more" indicator
         let show_more = self.file_tree.len() > height;
-        
+
         let visible_files: Vec<&String> = if show_more {
             self.file_tree.iter().take(height).collect()
         } else {
             self.file_tree.iter().collect()
         };
 
-        let mut items: Vec<ListItem> = visible_files.iter().map(|f| {
-            let style = if f.ends_with('/') || f.contains('/') {
-                Style::default().fg(Color::LightBlue).add_modifier(Modifier::BOLD)
-            } else if f.ends_with(".rs") {
-                Style::default().fg(Color::Yellow)
-            } else if f.ends_with(".toml") || f.ends_with(".md") {
-                Style::default().fg(Color::Cyan)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            ListItem::new(Line::from(Span::styled(format!("  {}", f), style)))
-        }).collect();
+        let mut items: Vec<ListItem> = visible_files
+            .iter()
+            .map(|f| {
+                let style = if f.ends_with('/') || f.contains('/') {
+                    Style::default()
+                        .fg(Color::LightBlue)
+                        .add_modifier(Modifier::BOLD)
+                } else if f.ends_with(".rs") {
+                    Style::default().fg(Color::Yellow)
+                } else if f.ends_with(".toml") || f.ends_with(".md") {
+                    Style::default().fg(Color::Cyan)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                ListItem::new(Line::from(Span::styled(format!("  {}", f), style)))
+            })
+            .collect();
 
         if show_more {
             let remaining = self.file_tree.len() - height;
             items.push(ListItem::new(Line::from(Span::styled(
                 format!("  ... (+{} more files)", remaining),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
             ))));
         }
 
@@ -109,7 +117,12 @@ impl App {
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(Color::DarkGray))
-                    .title(Span::styled(tr(self.lang, "sidebar_title"), Style::default().fg(Color::LightBlue).add_modifier(Modifier::BOLD)))
+                    .title(Span::styled(
+                        tr(self.lang, "sidebar_title"),
+                        Style::default()
+                            .fg(Color::LightBlue)
+                            .add_modifier(Modifier::BOLD),
+                    )),
             )
             .style(Style::default());
 
@@ -119,44 +132,56 @@ impl App {
     fn draw_reasoning(&self, frame: &mut Frame, area: Rect) {
         let mut lines: Vec<Line> = Vec::new();
         for line in self.current_reasoning.lines() {
-            lines.push(Line::from(vec![
-                Span::styled(line, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                line,
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            )]));
         }
 
         if lines.is_empty() {
             lines.push(Line::from(""));
-            lines.push(Line::from(vec![
-                Span::styled(match self.lang {
+            lines.push(Line::from(vec![Span::styled(
+                match self.lang {
                     crate::types::Language::Russian => "  ⟳ Соединение установлено...",
                     crate::types::Language::Kazakh => "  ⟳ Байланыс орнатылды...",
                     crate::types::Language::Chinese => "  ⟳ API 握手成功...",
                     crate::types::Language::English => "  ⟳ Handshake established...",
-                }, Style::default().fg(Color::LightMagenta).add_modifier(Modifier::BOLD))
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled(match self.lang {
+                },
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            lines.push(Line::from(vec![Span::styled(
+                match self.lang {
                     crate::types::Language::Russian => "  ⌛ Обработка промпта в очереди...",
                     crate::types::Language::Kazakh => "  ⌛ Кезекті өңдеу жүріп жатыр...",
                     crate::types::Language::Chinese => "  ⌛ 正在排队并处理提示词上下文...",
                     crate::types::Language::English => "  ⌛ Processing prompt & queuing...",
-                }, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled(match self.lang {
+                },
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            )]));
+            lines.push(Line::from(vec![Span::styled(
+                match self.lang {
                     crate::types::Language::Russian => "  ⚡ Пожалуйста, подождите (v4-pro)...",
                     crate::types::Language::Kazakh => "  ⚡ Күте тұрыңыз (v4-pro)...",
                     crate::types::Language::Chinese => "  ⚡ 请稍后 (v4-pro)...",
                     crate::types::Language::English => "  ⚡ Please wait (v4-pro)...",
-                }, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
-            ]));
+                },
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            )]));
         }
 
         // Auto-scroll reasoning process: keep thoughts locked to the bottom
         let total_lines = lines.len();
         let height = area.height.saturating_sub(2) as usize;
         let max_scroll = total_lines.saturating_sub(height);
-        
+
         let visible_lines = if max_scroll > 0 {
             lines[max_scroll..].to_vec()
         } else {
@@ -170,7 +195,12 @@ impl App {
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(Color::LightMagenta))
-                    .title(Span::styled(tr(self.lang, "reasoning_title"), Style::default().fg(Color::LightMagenta).add_modifier(Modifier::BOLD)))
+                    .title(Span::styled(
+                        tr(self.lang, "reasoning_title"),
+                        Style::default()
+                            .fg(Color::LightMagenta)
+                            .add_modifier(Modifier::BOLD),
+                    )),
             )
             .wrap(Wrap { trim: false });
 
@@ -178,17 +208,25 @@ impl App {
     }
 
     fn draw_diff(&self, frame: &mut Frame, area: Rect) {
-        let mut lines: Vec<Line> = Vec::new();
-
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::raw("   "),
-            Span::styled(tr(self.lang, "diff_banner"), Style::default().fg(Color::Black).bg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        ]));
-        lines.push(Line::from(""));
-        lines.push(Line::from(tr(self.lang, "diff_header_desc")));
-        lines.push(Line::from("   ─────────────────────────────────────────────────────────────────────────────"));
-        lines.push(Line::from(""));
+        let mut lines: Vec<Line> = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::raw("   "),
+                Span::styled(
+                    tr(self.lang, "diff_banner"),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(tr(self.lang, "diff_header_desc")),
+            Line::from(
+                "   ─────────────────────────────────────────────────────────────────────────────",
+            ),
+            Line::from(""),
+        ];
 
         if self.current_diff.trim().is_empty() {
             lines.push(Line::from(tr(self.lang, "diff_clean")));
@@ -219,7 +257,12 @@ impl App {
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(Color::Yellow))
-                    .title(Span::styled(tr(self.lang, "diff_title"), Style::default().fg(Color::LightYellow).add_modifier(Modifier::BOLD)))
+                    .title(Span::styled(
+                        tr(self.lang, "diff_title"),
+                        Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
+                    )),
             )
             .wrap(Wrap { trim: false });
 

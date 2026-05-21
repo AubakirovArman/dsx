@@ -12,8 +12,8 @@ pub struct CliArgs {
     pub workspace: PathBuf,
 
     /// Override permission mode
-    #[arg(short, long, default_value = "ask")]
-    pub mode: String,
+    #[arg(short, long)]
+    pub mode: Option<String>,
 
     /// Optional DeepSeek API key
     #[arg(short, long)]
@@ -41,6 +41,24 @@ pub enum Command {
         #[arg(required = true)]
         task: Vec<String>,
     },
+    /// Run benchmark/evaluation tasks from a JSON file
+    Eval {
+        /// JSON file containing one EvalTask or an array of EvalTask objects
+        tasks_file: PathBuf,
+        /// Only verify expected files/tests; do not call the model
+        #[arg(long)]
+        no_agent: bool,
+    },
+    /// Build or query the local code index
+    Index {
+        #[command(subcommand)]
+        action: IndexAction,
+    },
+    /// Inspect or call tools from an MCP stdio server
+    Mcp {
+        #[command(subcommand)]
+        action: McpAction,
+    },
     /// Interactive TUI mode (default)
     Interactive,
     /// Workspace and sessions operations
@@ -59,5 +77,43 @@ pub enum WorkspaceAction {
         /// Session ID to resume
         #[arg(required = true)]
         id: String,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum IndexAction {
+    /// Build the SQLite symbol index for the workspace
+    Build,
+    /// Search symbols and file contents
+    Search {
+        /// Query text
+        query: String,
+        /// Maximum results per result type
+        #[arg(short, long, default_value_t = 20)]
+        limit: u32,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum McpAction {
+    /// List tools from an MCP stdio server
+    List {
+        /// Server executable
+        command: String,
+        /// Arguments passed to the server executable
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Call one tool on an MCP stdio server
+    Call {
+        /// Tool name
+        tool: String,
+        /// Tool arguments as a JSON object
+        arguments_json: String,
+        /// Server executable
+        command: String,
+        /// Arguments passed to the server executable
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
     },
 }

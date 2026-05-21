@@ -1,8 +1,8 @@
 //! DeepSeek V4 API HTTP client.
 
-use reqwest::Client;
-use crate::types::ChatRequest;
 use crate::streaming::{StreamEvent, parse_sse_stream, parse_sse_stream_callback};
+use crate::types::ChatRequest;
+use reqwest::Client;
 
 pub struct DeepSeekClient {
     client: Client,
@@ -41,7 +41,8 @@ impl DeepSeekClient {
 
         while attempts < max_attempts {
             attempts += 1;
-            match self.client
+            match self
+                .client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(request)
@@ -87,7 +88,8 @@ impl DeepSeekClient {
 
         while attempts < max_attempts {
             attempts += 1;
-            let send_fut = self.client
+            let send_fut = self
+                .client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(&req)
@@ -113,7 +115,9 @@ impl DeepSeekClient {
                     last_err = e.into();
                 }
                 Err(_) => {
-                    last_err = anyhow::anyhow!("Connection timed out (no response headers received within 20s)");
+                    last_err = anyhow::anyhow!(
+                        "Connection timed out (no response headers received within 20s)"
+                    );
                 }
             }
 
@@ -142,7 +146,8 @@ impl DeepSeekClient {
 
         while attempts < max_attempts {
             attempts += 1;
-            let send_fut = self.client
+            let send_fut = self
+                .client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(&req)
@@ -168,14 +173,20 @@ impl DeepSeekClient {
                     last_err = e.into();
                 }
                 Err(_) => {
-                    last_err = anyhow::anyhow!("Connection timed out (no response headers received within 20s)");
+                    last_err = anyhow::anyhow!(
+                        "Connection timed out (no response headers received within 20s)"
+                    );
                 }
             }
 
             if attempts < max_attempts {
                 let msg = match attempts {
-                    1 => "⚠️ [Сервер перегружен / Очередь промпта превысила 20с. Переподключение...]\n",
-                    2 => "⚠️ [Таймаут первого байта. Вторая попытка переподключения через 2 секунды...]\n",
+                    1 => {
+                        "⚠️ [Сервер перегружен / Очередь промпта превысила 20с. Переподключение...]\n"
+                    }
+                    2 => {
+                        "⚠️ [Таймаут первого байта. Вторая попытка переподключения через 2 секунды...]\n"
+                    }
                     _ => "⚠️ [Задержка сети. Финальная попытка подключения через 3 секунды...]\n",
                 };
                 on_event(StreamEvent::Reasoning(msg.to_string()));

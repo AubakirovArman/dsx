@@ -2,8 +2,8 @@
 //!
 //! MVP: file discovery + metadata. Full tree-sitter/tantivy in v1.
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Symbol {
@@ -11,6 +11,24 @@ pub struct Symbol {
     pub kind: String, // "function", "struct", "class"
     pub start_line: u32,
     pub end_line: u32,
+    pub signature: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMatch {
+    pub path: String,
+    pub line: u32,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct IndexedSymbol {
+    pub path: String,
+    pub language: Option<String>,
+    pub kind: String,
+    pub name: String,
+    pub start_line: i32,
+    pub end_line: i32,
     pub signature: String,
 }
 
@@ -34,13 +52,18 @@ pub fn scan_project(root: &Path) -> anyhow::Result<Vec<String>> {
 }
 
 fn file_rank(path: &str) -> u8 {
-    if path == "Cargo.toml" || path == "package.json" || path == "go.mod" || path == "pyproject.toml" {
+    if path == "Cargo.toml"
+        || path == "package.json"
+        || path == "go.mod"
+        || path == "pyproject.toml"
+    {
         0
     } else if path == "README.md" || path == "Makefile" {
         1
     } else if path.starts_with("src/") || path.starts_with("crates/") || path.starts_with("lib/") {
         2
-    } else if path.starts_with("tests/") || path.ends_with("_test.rs") || path.ends_with(".test.ts") {
+    } else if path.starts_with("tests/") || path.ends_with("_test.rs") || path.ends_with(".test.ts")
+    {
         3
     } else {
         5
@@ -50,19 +73,62 @@ fn file_rank(path: &str) -> u8 {
 /// Detect project language based on configuration files.
 pub fn detect_language(root: &Path) -> Vec<String> {
     let mut langs = Vec::new();
-    if root.join("Cargo.toml").exists() { langs.push("rust".into()); }
-    if root.join("package.json").exists() { langs.push("typescript".into()); }
-    if root.join("go.mod").exists() { langs.push("go".into()); }
-    if root.join("pyproject.toml").exists() || root.join("setup.py").exists() { langs.push("python".into()); }
-    if root.join("pom.xml").exists() { langs.push("java".into()); }
+    if root.join("Cargo.toml").exists() {
+        langs.push("rust".into());
+    }
+    if root.join("package.json").exists() {
+        langs.push("typescript".into());
+    }
+    if root.join("go.mod").exists() {
+        langs.push("go".into());
+    }
+    if root.join("pyproject.toml").exists() || root.join("setup.py").exists() {
+        langs.push("python".into());
+    }
+    if root.join("pom.xml").exists() {
+        langs.push("java".into());
+    }
     langs
+}
+
+/// Search text files for a case-insensitive substring and return line matches.
+pub fn search_files(root: &Path, query: &str, limit: usize) -> anyhow::Result<Vec<FileMatch>> {
+    if query.trim().is_empty() || limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let needle = query.to_lowercase();
+    let mut matches = Vec::new();
+    for entry in ignore::WalkBuilder::new(root).build() {
+        let entry = entry?;
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(entry.path()) else {
+            continue;
+        };
+        for (idx, line) in content.lines().enumerate() {
+            if line.to_lowercase().contains(&needle) {
+                let rel = entry.path().strip_prefix(root).unwrap_or(entry.path());
+                matches.push(FileMatch {
+                    path: rel.display().to_string(),
+                    line: idx as u32 + 1,
+                    text: line.trim().to_string(),
+                });
+                if matches.len() >= limit {
+                    return Ok(matches);
+                }
+            }
+        }
+    }
+    Ok(matches)
 }
 
 /// Parse a source file and extract structural symbols.
 pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
     let mut symbols = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
-    
+
     // We only index supported languages
     if file_ext != "rs" && file_ext != "ts" && file_ext != "js" && file_ext != "py" {
         return symbols;
@@ -71,10 +137,15 @@ pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i].trim();
-        
+
         if file_ext == "rs" {
             // Match Rust functions
-            if line.contains("fn ") && (line.starts_with("fn ") || line.starts_with("pub ") || line.starts_with("async ") || line.starts_with("pub async ")) {
+            if line.contains("fn ")
+                && (line.starts_with("fn ")
+                    || line.starts_with("pub ")
+                    || line.starts_with("async ")
+                    || line.starts_with("pub async "))
+            {
                 if let Some(fn_name) = extract_rust_name(line, "fn ") {
                     let start = i as u32 + 1;
                     let end = find_closing_brace(&lines, i) as u32 + 1;
@@ -88,24 +159,25 @@ pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
                 }
             }
             // Match Rust structs
-            else if line.contains("struct ") && (line.starts_with("struct ") || line.starts_with("pub ")) {
-                if let Some(struct_name) = extract_rust_name(line, "struct ") {
-                    let start = i as u32 + 1;
-                    let end = find_closing_brace(&lines, i) as u32 + 1;
-                    symbols.push(Symbol {
-                        name: struct_name,
-                        kind: "struct".into(),
-                        start_line: start,
-                        end_line: end,
-                        signature: line.to_string(),
-                    });
-                }
+            else if line.contains("struct ")
+                && (line.starts_with("struct ") || line.starts_with("pub "))
+                && let Some(struct_name) = extract_rust_name(line, "struct ")
+            {
+                let start = i as u32 + 1;
+                let end = find_closing_brace(&lines, i) as u32 + 1;
+                symbols.push(Symbol {
+                    name: struct_name,
+                    kind: "struct".into(),
+                    start_line: start,
+                    end_line: end,
+                    signature: line.to_string(),
+                });
             }
         } else if file_ext == "py" {
             // Match Python functions/methods
-            if line.starts_with("def ") {
+            if let Some(stripped) = line.strip_prefix("def ") {
                 let signature = line.trim_end_matches(':').to_string();
-                let name = line["def ".len()..].split('(').next().unwrap_or("").trim().to_string();
+                let name = stripped.split('(').next().unwrap_or("").trim().to_string();
                 if !name.is_empty() {
                     let start = i as u32 + 1;
                     let end = find_python_block_end(&lines, i) as u32 + 1;
@@ -119,9 +191,17 @@ pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
                 }
             }
             // Match Python classes
-            else if line.starts_with("class ") {
+            else if let Some(stripped) = line.strip_prefix("class ") {
                 let signature = line.trim_end_matches(':').to_string();
-                let name = line["class ".len()..].split(':').next().unwrap_or("").split('(').next().unwrap_or("").trim().to_string();
+                let name = stripped
+                    .split(':')
+                    .next()
+                    .unwrap_or("")
+                    .split('(')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
                 if !name.is_empty() {
                     let start = i as u32 + 1;
                     let end = find_python_block_end(&lines, i) as u32 + 1;
@@ -136,7 +216,9 @@ pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
             }
         } else if file_ext == "ts" || file_ext == "js" {
             // Match JS/TS classes and functions
-            if line.contains("class ") && (line.starts_with("class ") || line.starts_with("export ")) {
+            if line.contains("class ")
+                && (line.starts_with("class ") || line.starts_with("export "))
+            {
                 if let Some(class_name) = extract_js_name(line, "class ") {
                     let start = i as u32 + 1;
                     let end = find_closing_brace(&lines, i) as u32 + 1;
@@ -148,31 +230,37 @@ pub fn extract_symbols(content: &str, file_ext: &str) -> Vec<Symbol> {
                         signature: line.to_string(),
                     });
                 }
-            } else if line.contains("function ") && (line.starts_with("function ") || line.starts_with("export ") || line.starts_with("async ")) {
-                if let Some(fn_name) = extract_js_name(line, "function ") {
-                    let start = i as u32 + 1;
-                    let end = find_closing_brace(&lines, i) as u32 + 1;
-                    symbols.push(Symbol {
-                        name: fn_name,
-                        kind: "function".into(),
-                        start_line: start,
-                        end_line: end,
-                        signature: line.to_string(),
-                    });
-                }
+            } else if line.contains("function ")
+                && (line.starts_with("function ")
+                    || line.starts_with("export ")
+                    || line.starts_with("async "))
+                && let Some(fn_name) = extract_js_name(line, "function ")
+            {
+                let start = i as u32 + 1;
+                let end = find_closing_brace(&lines, i) as u32 + 1;
+                symbols.push(Symbol {
+                    name: fn_name,
+                    kind: "function".into(),
+                    start_line: start,
+                    end_line: end,
+                    signature: line.to_string(),
+                });
             }
         }
-        
+
         i += 1;
     }
-    
+
     symbols
 }
 
 fn extract_rust_name(line: &str, keyword: &str) -> Option<String> {
     if let Some(idx) = line.find(keyword) {
         let remainder = &line[idx + keyword.len()..];
-        let name = remainder.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let name = remainder
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if !name.is_empty() {
             return Some(name.to_string());
         }
@@ -183,7 +271,10 @@ fn extract_rust_name(line: &str, keyword: &str) -> Option<String> {
 fn extract_js_name(line: &str, keyword: &str) -> Option<String> {
     if let Some(idx) = line.find(keyword) {
         let remainder = &line[idx + keyword.len()..];
-        let name = remainder.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let name = remainder
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if !name.is_empty() {
             return Some(name.to_string());
         }
@@ -194,8 +285,7 @@ fn extract_js_name(line: &str, keyword: &str) -> Option<String> {
 fn find_closing_brace(lines: &[&str], start_idx: usize) -> usize {
     let mut brace_count = 0;
     let mut found_first = false;
-    for idx in start_idx..lines.len() {
-        let line = lines[idx];
+    for (idx, line) in lines.iter().enumerate().skip(start_idx) {
         for ch in line.chars() {
             if ch == '{' {
                 brace_count += 1;
@@ -215,10 +305,12 @@ fn find_python_block_end(lines: &[&str], start_idx: usize) -> usize {
     if start_idx + 1 >= lines.len() {
         return start_idx;
     }
-    let first_line_indent = lines[start_idx].chars().take_while(|c| c.is_whitespace()).count();
-    
-    for idx in start_idx + 1..lines.len() {
-        let line = lines[idx];
+    let first_line_indent = lines[start_idx]
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .count();
+
+    for (idx, line) in lines.iter().enumerate().skip(start_idx + 1) {
         if line.trim().is_empty() {
             continue;
         }
@@ -235,50 +327,98 @@ pub async fn build_symbol_index(root: &Path, pool: &sqlx::SqlitePool) -> anyhow:
     // 1. Scan files
     let files = scan_project(root)?;
     let mut count = 0;
-    
+
     // Start explicit write transaction
     let mut tx = pool.begin().await?;
-    
+
     // Clear old symbols
     sqlx::query("DELETE FROM symbols WHERE project_root = ?")
         .bind(root.display().to_string())
         .execute(&mut *tx)
         .await?;
-        
+
     for file_path_str in files {
         let full_path = root.join(&file_path_str);
-        if let Some(ext) = full_path.extension().and_then(|s| s.to_str()) {
-            if ext == "rs" || ext == "ts" || ext == "js" || ext == "py" {
-                if let Ok(content) = tokio::fs::read_to_string(&full_path).await {
-                    let symbols = extract_symbols(&content, ext);
-                    for s in symbols {
-                        let id = uuid::Uuid::new_v4().to_string();
-                        sqlx::query(
-                            "INSERT INTO symbols (id, project_root, path, file_hash, language, kind, name, start_line, end_line, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                        )
-                        .bind(&id)
-                        .bind(root.display().to_string())
-                        .bind(&file_path_str)
-                        .bind("") // file hash can be empty for MVP
-                        .bind(ext)
-                        .bind(&s.kind)
-                        .bind(&s.name)
-                        .bind(s.start_line as i32)
-                        .bind(s.end_line as i32)
-                        .bind(&s.signature)
-                        .execute(&mut *tx)
-                        .await?;
-                        count += 1;
-                    }
-                }
-            }
+        let Some(ext) = full_path.extension().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !matches!(ext, "rs" | "ts" | "js" | "py") {
+            continue;
+        }
+        let Ok(content) = tokio::fs::read_to_string(&full_path).await else {
+            continue;
+        };
+
+        let symbols = extract_symbols(&content, ext);
+        for s in symbols {
+            let id = uuid::Uuid::new_v4().to_string();
+            sqlx::query(
+                "INSERT INTO symbols (id, project_root, path, file_hash, language, kind, name, start_line, end_line, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(&id)
+            .bind(root.display().to_string())
+            .bind(&file_path_str)
+            .bind("") // file hash can be empty for MVP
+            .bind(ext)
+            .bind(&s.kind)
+            .bind(&s.name)
+            .bind(s.start_line as i32)
+            .bind(s.end_line as i32)
+            .bind(&s.signature)
+            .execute(&mut *tx)
+            .await?;
+            count += 1;
         }
     }
-    
+
     // Commit transaction
     tx.commit().await?;
-    
+
     Ok(count)
+}
+
+/// Search the SQLite symbol index by symbol name, signature, or path.
+pub async fn search_symbols(
+    root: &Path,
+    pool: &sqlx::SqlitePool,
+    query: &str,
+    limit: u32,
+) -> anyhow::Result<Vec<IndexedSymbol>> {
+    if query.trim().is_empty() || limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let pattern = format!("%{}%", query.trim());
+    let prefix = format!("{}%", query.trim());
+    let rows = sqlx::query_as::<_, IndexedSymbol>(
+        r#"
+        SELECT path, language, kind, name, start_line, end_line, signature
+        FROM symbols
+        WHERE project_root = ?
+          AND (name LIKE ? OR signature LIKE ? OR path LIKE ?)
+        ORDER BY
+          CASE
+            WHEN name = ? THEN 0
+            WHEN name LIKE ? THEN 1
+            WHEN signature LIKE ? THEN 2
+            ELSE 3
+          END,
+          path ASC,
+          start_line ASC
+        LIMIT ?
+        "#,
+    )
+    .bind(root.display().to_string())
+    .bind(&pattern)
+    .bind(&pattern)
+    .bind(&pattern)
+    .bind(query.trim())
+    .bind(&prefix)
+    .bind(&pattern)
+    .bind(limit as i64)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 #[cfg(test)]
@@ -300,7 +440,7 @@ mod tests {
         "#;
         let symbols = extract_symbols(code, "rs");
         assert_eq!(symbols.len(), 2);
-        
+
         let s0 = &symbols[0];
         assert_eq!(s0.name, "AppState");
         assert_eq!(s0.kind, "struct");
@@ -312,5 +452,40 @@ mod tests {
         assert_eq!(s1.kind, "function");
         assert_eq!(s1.start_line, 7);
         assert_eq!(s1.end_line, 9);
+    }
+
+    #[test]
+    fn test_search_files() {
+        let tmp = std::env::temp_dir().join("dsx_index_search_files");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("src")).unwrap();
+        std::fs::write(tmp.join("src/lib.rs"), "pub fn target_symbol() {}\n").unwrap();
+
+        let matches = search_files(&tmp, "TARGET", 10).unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].path, "src/lib.rs");
+        assert_eq!(matches[0].line, 1);
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_search_symbols() {
+        let tmp = std::env::temp_dir().join("dsx_index_search_symbols");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("src")).unwrap();
+        std::fs::write(
+            tmp.join("src/lib.rs"),
+            "pub struct Thing {}\nimpl Thing { pub fn make() -> Self { Thing {} } }\n",
+        )
+        .unwrap();
+
+        let db = tmp.join(".dsx/sessions.db");
+        let pool = dsx_memory::open(&db).await.unwrap();
+        build_symbol_index(&tmp, &pool).await.unwrap();
+        let matches = search_symbols(&tmp, &pool, "Thing", 10).await.unwrap();
+        assert!(matches.iter().any(|symbol| symbol.name == "Thing"));
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

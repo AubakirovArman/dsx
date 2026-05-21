@@ -17,6 +17,7 @@ dsx-context.workspace = true
 dsx-git.workspace = true
 dsx-sandbox.workspace = true
 dsx-prompts.workspace = true
+dsx-mcp.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true

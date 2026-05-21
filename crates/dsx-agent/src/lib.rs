@@ -1,19 +1,22 @@
 //! DSX Agent — ReAct-based orchestration and streaming execution.
 
-pub mod types;
 pub mod classify;
-pub mod tool_executor;
-pub mod tool_implementations;
-pub mod tool_executor_tests;
 pub mod runner_sync;
+pub mod tool_executor;
+pub mod tool_executor_tests;
+pub mod tool_implementations;
+pub mod types;
 
-pub use types::{ToolResult, AgentConfig, AgentOutcome, ApprovalRequest};
 pub use classify::{classify, heuristic_classify};
 pub use runner_sync::run;
+pub use types::{AgentConfig, AgentOutcome, ApprovalRequest, ToolResult};
 
-use tokio::sync::mpsc;
-use dsx_provider::types::{ChatRequest, Message, ToolCall, FunctionCall, ToolDef, FunctionDef, ThinkingConfig, StreamOptions};
 use dsx_provider::streaming::StreamEvent;
+use dsx_provider::types::{
+    ChatRequest, FunctionCall, FunctionDef, Message, StreamOptions, ThinkingConfig, ToolCall,
+    ToolDef,
+};
+use tokio::sync::mpsc;
 
 // Pricing per 1M tokens (May 2026)
 const PRO_INPUT_COST: f64 = 1.74;
@@ -51,17 +54,37 @@ async fn run_streaming_internal(
     tx: mpsc::UnboundedSender<StreamEvent>,
 ) -> anyhow::Result<AgentOutcome> {
     let project_root = &config.project_root;
-    let client = dsx_provider::client::DeepSeekClient::new_with_base(config.api_key.clone(), config.api_base.clone());
+    let client = dsx_provider::client::DeepSeekClient::new_with_base(
+        config.api_key.clone(),
+        config.api_base.clone(),
+    );
     let route = classify(task, &config.api_key, &config.api_base).await?;
-    let ctx = dsx_context::ContextManager::new().collect(project_root, 250_000).await?;
+    let ctx = dsx_context::ContextManager::new()
+        .collect(project_root, 250_000)
+        .await?;
     let context_str = dsx_context::format_context(&ctx);
     let system_prompt = dsx_prompts::lead_agent();
     let tools = build_tool_defs();
     let (model_name, thinking, effort) = dsx_provider::model_config(route);
 
     let mut messages: Vec<Message> = vec![
-        Message { role: "system".into(), content: Some(system_prompt), tool_calls: None, tool_call_id: None, reasoning_content: None },
-        Message { role: "system".into(), content: Some(format!("Current workspace project context:\n{}", context_str)), tool_calls: None, tool_call_id: None, reasoning_content: None },
+        Message {
+            role: "system".into(),
+            content: Some(system_prompt),
+            tool_calls: None,
+            tool_call_id: None,
+            reasoning_content: None,
+        },
+        Message {
+            role: "system".into(),
+            content: Some(format!(
+                "Current workspace project context:\n{}",
+                context_str
+            )),
+            tool_calls: None,
+            tool_call_id: None,
+            reasoning_content: None,
+        },
     ];
 
     if let Some(instructions) = dsx_context::load_project_instructions(project_root) {
@@ -74,7 +97,13 @@ async fn run_streaming_internal(
         });
     }
 
-    messages.push(Message { role: "user".into(), content: Some(task.to_string()), tool_calls: None, tool_call_id: None, reasoning_content: None });
+    messages.push(Message {
+        role: "user".into(),
+        content: Some(task.to_string()),
+        tool_calls: None,
+        tool_call_id: None,
+        reasoning_content: None,
+    });
 
     let mut total_prompt: u64 = 0;
     let mut total_completion: u64 = 0;
@@ -90,19 +119,29 @@ async fn run_streaming_internal(
             messages: messages.clone(),
             stream: Some(true),
             tools: Some(tools.clone()),
-            thinking: if thinking { Some(ThinkingConfig { type_: "enabled".into() }) } else { None },
+            thinking: if thinking {
+                Some(ThinkingConfig {
+                    type_: "enabled".into(),
+                })
+            } else {
+                None
+            },
             reasoning_effort: effort.map(|e| e.to_string()),
             max_tokens: Some(16384),
-            stream_options: Some(StreamOptions { include_usage: true }),
+            stream_options: Some(StreamOptions {
+                include_usage: true,
+            }),
         };
 
         // Use callback-based streaming — events go to TUI in real-time
         let tx_clone = tx.clone();
         let mut events_buf: Vec<StreamEvent> = Vec::new();
-        client.chat_stream_callback(&request, |ev| {
-            let _ = tx_clone.send(ev.clone());
-            events_buf.push(ev);
-        }).await?;
+        client
+            .chat_stream_callback(&request, |ev| {
+                let _ = tx_clone.send(ev.clone());
+                events_buf.push(ev);
+            })
+            .await?;
         let events = events_buf;
 
         // Process (same logic as run())
@@ -117,16 +156,29 @@ async fn run_streaming_internal(
                 StreamEvent::Reasoning(r) => reasoning.push_str(r),
                 StreamEvent::Content(c) => content.push_str(c),
                 StreamEvent::ToolCall(tc) => {
-                    let call = ToolCall { id: tc.id.clone(), type_: "function".into(), function: FunctionCall { name: tc.name.clone(), arguments: tc.arguments.clone() } };
+                    let call = ToolCall {
+                        id: tc.id.clone(),
+                        type_: "function".into(),
+                        function: FunctionCall {
+                            name: tc.name.clone(),
+                            arguments: tc.arguments.clone(),
+                        },
+                    };
                     tool_calls.push(call.clone());
                     finish_calls.push(call);
                 }
-                StreamEvent::Finish { finish_reason: _, usage: u } => {
-                    if u.is_some() || usage.is_none() { usage = u.clone(); }
+                StreamEvent::Finish {
+                    finish_reason: _,
+                    usage: u,
+                } => {
+                    if u.is_some() || usage.is_none() {
+                        usage = u.clone();
+                    }
                 }
                 StreamEvent::Error(err) => {
                     anyhow::bail!("Agent error: {err}");
                 }
+                StreamEvent::ToolResult { .. } => {}
                 StreamEvent::Done { .. } => {}
             }
         }
@@ -141,10 +193,22 @@ async fn run_streaming_internal(
 
         messages.push(Message {
             role: "assistant".into(),
-            content: if content.is_empty() { None } else { Some(content.clone()) },
-            tool_calls: if finish_calls.is_empty() { None } else { Some(finish_calls) },
+            content: if content.is_empty() {
+                None
+            } else {
+                Some(content.clone())
+            },
+            tool_calls: if finish_calls.is_empty() {
+                None
+            } else {
+                Some(finish_calls)
+            },
             tool_call_id: None,
-            reasoning_content: if reasoning.is_empty() { None } else { Some(reasoning) },
+            reasoning_content: if reasoning.is_empty() {
+                None
+            } else {
+                Some(reasoning)
+            },
         });
 
         let is_last = i + 1 >= config.max_iterations;
@@ -160,19 +224,49 @@ async fn run_streaming_internal(
         };
         let mut tool_msgs: Vec<Message> = Vec::new();
         for tc in &tool_calls {
-            let call_ready = dsx_provider::streaming::ToolCallReady { id: tc.id.clone(), name: tc.function.name.clone(), arguments: tc.function.arguments.clone() };
+            let call_ready = dsx_provider::streaming::ToolCallReady {
+                id: tc.id.clone(),
+                name: tc.function.name.clone(),
+                arguments: tc.function.arguments.clone(),
+            };
             let result = tool_executor::execute(&call_ready, &tool_ctx).await;
+            let result_summary = summarize_tool_result(&result);
+            let _ = tx.send(StreamEvent::ToolResult {
+                name: result.name.clone(),
+                success: result.success,
+                summary: result_summary,
+            });
             all_tool_results.push(result.clone());
             if !is_last {
-                tool_msgs.push(Message { role: "tool".into(), content: Some(result.content), tool_calls: None, tool_call_id: Some(tc.id.clone()), reasoning_content: None });
+                tool_msgs.push(Message {
+                    role: "tool".into(),
+                    content: Some(result.content),
+                    tool_calls: None,
+                    tool_call_id: Some(tc.id.clone()),
+                    reasoning_content: None,
+                });
             }
         }
-        if is_last { break; }
+        if is_last {
+            break;
+        }
         messages.extend(tool_msgs);
     }
 
+    if final_answer.is_none() {
+        final_answer = Some(format!(
+            "Reached the iteration limit after {} iteration(s). Last tool results: {}",
+            iterations,
+            summarize_tool_results(&all_tool_results)
+        ));
+    }
+
     let is_pro = model_name.contains("pro");
-    let (input_cost_per_m, output_cost_per_m) = if is_pro { (PRO_INPUT_COST, PRO_OUTPUT_COST) } else { (FLASH_INPUT_COST, FLASH_OUTPUT_COST) };
+    let (input_cost_per_m, output_cost_per_m) = if is_pro {
+        (PRO_INPUT_COST, PRO_OUTPUT_COST)
+    } else {
+        (FLASH_INPUT_COST, FLASH_OUTPUT_COST)
+    };
     let estimated_cost = (total_prompt as f64 / 1_000_000.0) * input_cost_per_m
         + (total_completion as f64 / 1_000_000.0) * output_cost_per_m;
 
@@ -185,6 +279,32 @@ async fn run_streaming_internal(
         estimated_cost_usd: estimated_cost,
         tool_results: all_tool_results,
     })
+}
+
+fn summarize_tool_result(result: &ToolResult) -> String {
+    let mut summary: String = result.content.chars().take(300).collect();
+    if result.content.chars().count() > 300 {
+        summary.push_str("...");
+    }
+    summary
+}
+
+fn summarize_tool_results(results: &[ToolResult]) -> String {
+    if results.is_empty() {
+        return "none".into();
+    }
+
+    results
+        .iter()
+        .rev()
+        .take(3)
+        .map(|result| {
+            let status = if result.success { "ok" } else { "failed" };
+            let summary = summarize_tool_result(result);
+            format!("{}={}: {}", result.name, status, summary)
+        })
+        .collect::<Vec<_>>()
+        .join(" | ")
 }
 
 pub fn build_tool_defs() -> Vec<ToolDef> {

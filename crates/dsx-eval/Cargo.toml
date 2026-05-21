@@ -6,7 +6,10 @@ license.workspace = true
 description = "DSX evaluation: benchmark tasks and regression suite"
 
 [dependencies]
+dsx-agent.workspace = true
 dsx-core.workspace = true
+dsx-sandbox.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 anyhow.workspace = true

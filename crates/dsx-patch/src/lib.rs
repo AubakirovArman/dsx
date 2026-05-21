@@ -23,8 +23,15 @@ pub struct FileChange {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ApplyResult {
-    Applied { path: String, tier: u8, content: String },
-    Failed { path: String, reason: String },
+    Applied {
+        path: String,
+        tier: u8,
+        content: String,
+    },
+    Failed {
+        path: String,
+        reason: String,
+    },
 }
 
 /// Attempt to apply a SEARCH/REPLACE change to a file.
@@ -95,7 +102,7 @@ fn try_whitespace_insensitive(original: &str, change: &FileChange) -> Option<Str
 
     if let Some(compact_start) = orig_compact.find(&search_compact) {
         let compact_end = compact_start + search_compact.len();
-        
+
         // Map back to byte positions in original string
         let orig_start_index = char_indices[compact_start];
         let last_char_idx = char_indices[compact_end - 1];
@@ -170,7 +177,11 @@ fn try_indent_preserving(original: &str, change: &FileChange) -> Option<String> 
             for r in indented_replace {
                 new_lines.push(r);
             }
-            new_lines.extend(orig_lines[i + clean_search.len()..].iter().map(|s| s.to_string()));
+            new_lines.extend(
+                orig_lines[i + clean_search.len()..]
+                    .iter()
+                    .map(|s| s.to_string()),
+            );
 
             return Some(new_lines.join("\n"));
         }

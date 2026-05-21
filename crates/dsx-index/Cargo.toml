@@ -12,3 +12,6 @@ serde.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "tls-rustls"] }
 tokio = { workspace = true, features = ["full"] }
 uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+dsx-memory.workspace = true

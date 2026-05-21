@@ -1,7 +1,7 @@
 //! DSX Session Manager — create, persist, and resume agent sessions.
 
-use sqlx::SqlitePool;
 use chrono::Utc;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 pub struct SessionManager {
@@ -57,7 +57,7 @@ impl SessionManager {
     /// Get a session by its ID.
     pub async fn get(&self, id: &str) -> anyhow::Result<Option<Session>> {
         let row = sqlx::query_as::<_, SessionRow>(
-            "SELECT id, project_root, mode, created_at, message_count FROM sessions WHERE id = ?"
+            "SELECT id, project_root, mode, created_at, message_count FROM sessions WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -79,13 +79,16 @@ impl SessionManager {
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(|r| Session {
-            id: r.id,
-            project_root: r.project_root,
-            mode: r.mode,
-            created_at: r.created_at,
-            message_count: r.message_count,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| Session {
+                id: r.id,
+                project_root: r.project_root,
+                mode: r.mode,
+                created_at: r.created_at,
+                message_count: r.message_count,
+            })
+            .collect())
     }
 
     /// Record an event in a session.
@@ -98,7 +101,7 @@ impl SessionManager {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         sqlx::query(
-            "INSERT INTO events (id, session_id, ts, type, data_json) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO events (id, session_id, ts, type, data_json) VALUES (?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(session_id)
@@ -109,7 +112,7 @@ impl SessionManager {
         .await?;
         // Bump session message count and updated_at
         sqlx::query(
-            "UPDATE sessions SET message_count = message_count + 1, updated_at = ? WHERE id = ?"
+            "UPDATE sessions SET message_count = message_count + 1, updated_at = ? WHERE id = ?",
         )
         .bind(&now)
         .bind(session_id)
@@ -126,13 +129,16 @@ impl SessionManager {
         .bind(session_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(|r| Event {
-            id: r.id,
-            session_id: r.session_id,
-            ts: r.ts,
-            type_: r.type_,
-            data_json: r.data_json,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| Event {
+                id: r.id,
+                session_id: r.session_id,
+                ts: r.ts,
+                type_: r.type_,
+                data_json: r.data_json,
+            })
+            .collect())
     }
 }
 

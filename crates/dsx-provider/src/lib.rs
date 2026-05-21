@@ -1,8 +1,8 @@
 //! DeepSeek V4 API client — OpenAI-compatible Chat Completions.
 
 pub mod client;
-pub mod types;
 pub mod streaming;
+pub mod types;
 
 use dsx_core::types::ModelRoute;
 
