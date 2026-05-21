@@ -30,12 +30,16 @@ pub async fn run_context_preview(
     project_root: &Path,
     task: &str,
     json: bool,
+    check: bool,
 ) -> anyhow::Result<()> {
     let preview = build_context_preview(project_root, task).await?;
     if json {
         println!("{}", preview_json(&preview));
     } else {
         print_preview(&preview);
+    }
+    if check {
+        enforce_request_budget(&preview)?;
     }
     Ok(())
 }
@@ -154,6 +158,17 @@ pub(crate) fn preview_json(preview: &ContextPreview) -> serde_json::Value {
             "request_budget_status": preview.metrics.request_budget_status,
         },
     })
+}
+
+pub(crate) fn enforce_request_budget(preview: &ContextPreview) -> anyhow::Result<()> {
+    let estimated = preview.metrics.estimated_request_tokens;
+    let limit = preview.metrics.max_request_tokens;
+    if estimated > limit {
+        anyhow::bail!(
+            "Context preview over request budget: estimated {estimated} tokens, limit {limit}. Narrow the task scope or reduce context before calling the model."
+        );
+    }
+    Ok(())
 }
 
 fn context_metrics(

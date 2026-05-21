@@ -65,6 +65,9 @@ pub enum Command {
         /// Print machine-readable JSON
         #[arg(long)]
         json: bool,
+        /// Exit with an error when the estimated request exceeds the budget
+        #[arg(long)]
+        check: bool,
     },
     /// Build or query the local code index
     Index {

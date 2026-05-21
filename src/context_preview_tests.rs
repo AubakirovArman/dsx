@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::context_preview::{build_context_preview, preview_json};
+    use crate::context_preview::{build_context_preview, enforce_request_budget, preview_json};
 
     #[tokio::test]
     async fn context_preview_uses_narrowed_existing_scope() {
@@ -88,6 +88,21 @@ mod tests {
         assert!(preview.project_instructions.is_some());
         assert!(preview.metrics.project_instructions_chars > 0);
 
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn context_preview_check_rejects_over_budget() {
+        let root = temp_root("dsx_context_preview_check");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+
+        let mut preview = build_context_preview(&root, "build").await.unwrap();
+        preview.metrics.max_request_tokens = preview.metrics.estimated_request_tokens - 1;
+
+        let err = enforce_request_budget(&preview).unwrap_err();
+
+        assert!(err.to_string().contains("over request budget"));
         let _ = std::fs::remove_dir_all(root);
     }
 
