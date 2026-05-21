@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-struct LocatedRun {
-    db_path: PathBuf,
-    run: dsx_memory::AgentRunRecord,
+pub(crate) struct LocatedRun {
+    pub(crate) db_path: PathBuf,
+    pub(crate) run: dsx_memory::AgentRunRecord,
 }
 
 pub async fn list_agent_runs(project_root: &Path, limit: u32, all: bool) {
@@ -23,7 +23,7 @@ pub async fn running_run_count(project_root: &Path) -> anyhow::Result<usize> {
     Ok(count)
 }
 
-async fn collect_agent_runs(
+pub(crate) async fn collect_agent_runs(
     project_root: &Path,
     limit: u32,
     all: bool,

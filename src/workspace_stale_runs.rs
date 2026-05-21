@@ -15,6 +15,17 @@ pub async fn close_stale_runs(project_root: &Path, older_than_minutes: i64, dry_
     }
 }
 
+pub(crate) async fn stale_run_count(
+    project_root: &Path,
+    older_than_minutes: i64,
+) -> anyhow::Result<i64> {
+    let mut total = 0;
+    for db_path in crate::workspace_runs::discover_run_dbs(project_root)? {
+        total += count_stale_rows(&db_path, older_than_minutes.max(0)).await?;
+    }
+    Ok(total)
+}
+
 async fn close_stale_runs_inner(
     project_root: &Path,
     older_than_minutes: i64,

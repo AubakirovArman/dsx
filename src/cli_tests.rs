@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::{CliArgs, Command};
+    use crate::cli::{CliArgs, Command, WorkspaceAction};
     use clap::Parser;
 
     #[test]
@@ -39,6 +39,30 @@ mod tests {
         };
         assert_eq!(task, vec!["почини".to_string(), "1234".to_string()]);
         assert_eq!(limit, 3);
+        assert!(json);
+    }
+
+    #[test]
+    fn parses_workspace_audit_flags() {
+        let cli = CliArgs::try_parse_from([
+            "dsx",
+            "workspace",
+            "audit",
+            "--json",
+            "--all",
+            "--limit",
+            "4",
+        ])
+        .unwrap();
+
+        let Some(Command::Workspace {
+            action: Some(WorkspaceAction::Audit { limit, all, json }),
+        }) = cli.command
+        else {
+            panic!("expected workspace audit command");
+        };
+        assert_eq!(limit, 4);
+        assert!(all);
         assert!(json);
     }
 }

@@ -138,6 +138,18 @@ pub enum WorkspaceAction {
         #[arg(long)]
         all: bool,
     },
+    /// Show one-screen workspace health across scope, runs, notes, and budgets
+    Audit {
+        /// Maximum runs/scopes to inspect
+        #[arg(short, long, default_value_t = 10)]
+        limit: u32,
+        /// Include .dsx ledgers and notes in child task scopes
+        #[arg(long)]
+        all: bool,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Show compact task notes saved for workspace scopes
     Notes {
         /// Maximum scopes to show

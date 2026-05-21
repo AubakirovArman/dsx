@@ -1,5 +1,4 @@
 //! DSX Code — terminal coding agent entrypoint.
-
 pub mod agent_preflight;
 #[cfg(test)]
 mod agent_preflight_tests;
@@ -42,6 +41,7 @@ mod tui_state_tests;
 pub mod tui_task;
 #[cfg(test)]
 mod tui_task_tests;
+pub mod workspace_audit;
 pub mod workspace_notes;
 #[cfg(test)]
 mod workspace_notes_tests;
@@ -240,6 +240,9 @@ async fn run_workspace_action(
         None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
         Some(WorkspaceAction::Runs { limit, all }) => {
             list_agent_runs(&project_root, limit, all).await
+        }
+        Some(WorkspaceAction::Audit { limit, all, json }) => {
+            crate::workspace_audit::run_workspace_audit(&project_root, limit, all, json).await
         }
         Some(WorkspaceAction::Notes { limit, all, json }) => {
             list_workspace_notes(&project_root, limit, all, json).await
