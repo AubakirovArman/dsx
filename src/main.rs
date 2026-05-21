@@ -1,5 +1,8 @@
 //! DSX Code — terminal coding agent entrypoint.
 
+pub mod agent_preflight;
+#[cfg(test)]
+mod agent_preflight_tests;
 pub mod cli;
 #[cfg(test)]
 mod cli_tests;
@@ -37,6 +40,7 @@ mod workspace_notes_tests;
 pub mod workspace_runs;
 pub mod workspace_stale_runs;
 
+use agent_preflight::run_agent_preflight;
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
 use context_preview::run_context_preview;
@@ -102,6 +106,10 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::Scope { task }) => {
             let desc = task.join(" ");
             run_scope_preview(&project_root, &desc);
+        }
+        Some(Command::Preflight { task, json, check }) => {
+            let desc = task.join(" ");
+            run_agent_preflight(&project_root, &desc, allow_wide_scope, json, check)?;
         }
         Some(Command::Context {
             task,

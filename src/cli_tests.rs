@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::CliArgs;
+    use crate::cli::{CliArgs, Command};
     use clap::Parser;
 
     #[test]
@@ -12,5 +12,19 @@ mod tests {
                 .unwrap();
 
         assert!(cli.allow_wide_scope);
+    }
+
+    #[test]
+    fn parses_preflight_json_check_flags() {
+        let cli =
+            CliArgs::try_parse_from(["dsx", "preflight", "--json", "--check", "почини", "1234"])
+                .unwrap();
+
+        let Some(Command::Preflight { task, json, check }) = cli.command else {
+            panic!("expected preflight command");
+        };
+        assert_eq!(task, vec!["почини".to_string(), "1234".to_string()]);
+        assert!(json);
+        assert!(check);
     }
 }

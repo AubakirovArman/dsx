@@ -61,6 +61,18 @@ pub enum Command {
         #[arg(required = true)]
         task: Vec<String>,
     },
+    /// Dry-run an agent start and show scope/policy decisions
+    Preflight {
+        /// Task text to resolve against the launch workspace
+        #[arg(required = true)]
+        task: Vec<String>,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
+        /// Exit with an error when preflight would block the run
+        #[arg(long)]
+        check: bool,
+    },
     /// Preview the compact model context for a task without calling the model
     Context {
         /// Task text to resolve and assemble context for
