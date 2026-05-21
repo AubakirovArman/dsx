@@ -12,6 +12,18 @@ pub(crate) struct ContextPreview {
     pub(crate) system_note: String,
     pub(crate) project_context: String,
     pub(crate) task_brief: String,
+    pub(crate) project_instructions: Option<String>,
+    pub(crate) metrics: ContextMetrics,
+}
+
+pub(crate) struct ContextMetrics {
+    pub(crate) project_context_chars: usize,
+    pub(crate) task_brief_chars: usize,
+    pub(crate) project_instructions_chars: usize,
+    pub(crate) estimated_request_tokens: u64,
+    pub(crate) max_request_tokens: u64,
+    pub(crate) response_cap_tokens: u32,
+    pub(crate) request_budget_status: String,
 }
 
 pub async fn run_context_preview(
@@ -37,6 +49,18 @@ pub(crate) async fn build_context_preview(
     let ctx = collect_preview_context(&scope.active_root).await?;
     let project_context = dsx_context::format_context(&ctx);
     let task_brief = dsx_agent::brief::build_task_brief(&clean_task, &scope, &ctx);
+    let project_instructions = scope
+        .active_root
+        .exists()
+        .then(|| dsx_context::load_project_instructions(&scope.active_root))
+        .flatten();
+    let metrics = context_metrics(
+        &scope.system_note(),
+        &project_context,
+        &task_brief,
+        project_instructions.as_deref(),
+        &clean_task,
+    )?;
 
     Ok(ContextPreview {
         task: task.into(),
@@ -48,6 +72,8 @@ pub(crate) async fn build_context_preview(
         system_note: scope.system_note(),
         project_context,
         task_brief,
+        project_instructions,
+        metrics,
     })
 }
 
@@ -86,8 +112,23 @@ fn print_preview(preview: &ContextPreview) {
         "  Active exists: {}",
         if preview.active_exists { "yes" } else { "no" }
     );
+    println!(
+        "  Request estimate: {} tokens / {} ({})",
+        preview.metrics.estimated_request_tokens,
+        preview.metrics.max_request_tokens,
+        preview.metrics.request_budget_status
+    );
+    println!(
+        "  Context chars: project={} brief={} instructions={}",
+        preview.metrics.project_context_chars,
+        preview.metrics.task_brief_chars,
+        preview.metrics.project_instructions_chars
+    );
     println!("\nSystem scope note:\n{}\n", preview.system_note);
     println!("Compact task brief:\n{}\n", preview.task_brief);
+    if let Some(instructions) = &preview.project_instructions {
+        println!("Project-specific instructions:\n{}\n", instructions);
+    }
     println!("Project context:\n{}", preview.project_context);
 }
 
@@ -101,84 +142,99 @@ pub(crate) fn preview_json(preview: &ContextPreview) -> serde_json::Value {
         "active_exists": preview.active_exists,
         "system_note": preview.system_note,
         "task_brief": preview.task_brief,
+        "project_instructions": preview.project_instructions,
         "project_context": preview.project_context,
+        "metrics": {
+            "project_context_chars": preview.metrics.project_context_chars,
+            "task_brief_chars": preview.metrics.task_brief_chars,
+            "project_instructions_chars": preview.metrics.project_instructions_chars,
+            "estimated_request_tokens": preview.metrics.estimated_request_tokens,
+            "max_request_tokens": preview.metrics.max_request_tokens,
+            "response_cap_tokens": preview.metrics.response_cap_tokens,
+            "request_budget_status": preview.metrics.request_budget_status,
+        },
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn context_metrics(
+    system_note: &str,
+    project_context: &str,
+    task_brief: &str,
+    project_instructions: Option<&str>,
+    clean_task: &str,
+) -> anyhow::Result<ContextMetrics> {
+    let response_cap_tokens = 16_384;
+    let estimated_request_tokens = estimate_start_request_tokens(
+        system_note,
+        project_context,
+        task_brief,
+        project_instructions,
+        clean_task,
+        response_cap_tokens,
+    )?;
+    let limits = dsx_agent::budget::current_limits();
+    Ok(ContextMetrics {
+        project_context_chars: project_context.chars().count(),
+        task_brief_chars: task_brief.chars().count(),
+        project_instructions_chars: project_instructions
+            .map(|value| value.chars().count())
+            .unwrap_or(0),
+        estimated_request_tokens,
+        max_request_tokens: limits.max_request_tokens,
+        response_cap_tokens,
+        request_budget_status: if estimated_request_tokens <= limits.max_request_tokens {
+            "ok".into()
+        } else {
+            "over".into()
+        },
+    })
+}
 
-    #[tokio::test]
-    async fn context_preview_uses_narrowed_existing_scope() {
-        let root = temp_root("dsx_context_preview_existing");
-        let child = root.join("1234");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&child).unwrap();
-        std::fs::write(child.join("Cargo.toml"), "[package]\n").unwrap();
+fn estimate_start_request_tokens(
+    system_note: &str,
+    project_context: &str,
+    task_brief: &str,
+    project_instructions: Option<&str>,
+    clean_task: &str,
+    response_cap_tokens: u32,
+) -> anyhow::Result<u64> {
+    use dsx_provider::types::ChatRequest;
 
-        let preview = build_context_preview(&root, "почини 1234").await.unwrap();
-
-        assert!(preview.narrowed);
-        assert!(preview.active_exists);
-        assert_eq!(
-            preview.active_scope,
-            child.canonicalize().unwrap().display().to_string()
-        );
-        assert!(preview.project_context.contains("Cargo.toml"));
-        assert!(preview.task_brief.contains("Active scope:"));
-
-        let _ = std::fs::remove_dir_all(root);
+    let mut messages = vec![
+        msg("system", dsx_prompts::lead_agent()),
+        msg(
+            "system",
+            format!("{system_note}\n\nCurrent workspace project context:\n{project_context}"),
+        ),
+        msg("system", task_brief),
+    ];
+    if let Some(instructions) = project_instructions {
+        messages.push(msg(
+            "system",
+            format!("Project-specific instructions:\n{instructions}"),
+        ));
     }
+    messages.push(msg("user", clean_task));
 
-    #[tokio::test]
-    async fn context_preview_does_not_create_missing_scope() {
-        let root = temp_root("dsx_context_preview_missing");
-        let child = root.join("1234");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
+    let request = ChatRequest {
+        model: "deepseek-v4-pro".into(),
+        messages,
+        stream: Some(true),
+        tools: Some(dsx_agent::build_tool_defs()),
+        thinking: None,
+        reasoning_effort: None,
+        max_tokens: Some(response_cap_tokens),
+        stream_options: None,
+    };
+    dsx_agent::budget::estimate_request_tokens(&request)
+}
 
-        let preview = build_context_preview(&root, "создай проект 1234")
-            .await
-            .unwrap();
-
-        assert!(preview.narrowed);
-        assert!(!preview.active_exists);
-        assert!(!child.exists());
-        assert!(preview.project_context.contains("does not exist yet"));
-
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[tokio::test]
-    async fn context_preview_json_contains_prompt_parts() {
-        let root = temp_root("dsx_context_preview_json");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-
-        let preview = build_context_preview(&root, "build").await.unwrap();
-        let value = preview_json(&preview);
-
-        assert_eq!(
-            value["active_scope"],
-            root.canonicalize().unwrap().display().to_string()
-        );
-        assert!(value["task_brief"].as_str().unwrap().contains("Goal:"));
-        assert!(
-            value["project_context"]
-                .as_str()
-                .unwrap()
-                .contains("Project:")
-        );
-
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    fn temp_root(name: &str) -> std::path::PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{name}_{nanos}"))
+fn msg(role: &str, content: impl Into<String>) -> dsx_provider::types::Message {
+    dsx_provider::types::Message {
+        role: role.into(),
+        content: Some(content.into()),
+        tool_calls: None,
+        tool_call_id: None,
+        reasoning_content: None,
     }
 }

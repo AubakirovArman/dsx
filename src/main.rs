@@ -2,6 +2,8 @@
 
 pub mod cli;
 pub mod context_preview;
+#[cfg(test)]
+mod context_preview_tests;
 pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
