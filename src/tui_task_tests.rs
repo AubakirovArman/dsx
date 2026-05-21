@@ -71,6 +71,29 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn prepare_task_blocks_wide_container_scope_and_keeps_input() {
+        let root = temp_root("dsx_prepare_wide_container");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        app.lock().unwrap().input = "доработай проект".into();
+
+        let prepared = prepare_task(&app, &root, "key");
+
+        assert!(prepared.is_none());
+        let app = app.lock().unwrap();
+        assert_eq!(app.input, "доработай проект");
+        assert_eq!(app.active_run_id, None);
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("Wide container workspace blocked"))
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[tokio::test]
     async fn stop_agent_task_aborts_handle_and_clears_state() {
         let app = Arc::new(Mutex::new(dsx_tui::App::new()));

@@ -113,7 +113,14 @@ pub(crate) fn prepare_task(
         app.scroll_offset = 0;
         return None;
     }
-    if let Some(message) = task_start_blocker(&app) {
+    if let Some(message) = crate::tui_scope_guard::task_start_blocker(&app) {
+        app.add_message("system", message);
+        return None;
+    }
+    let scope = crate::task_scope::resolve_task_scope(project_root, &task);
+    if let Some(message) =
+        crate::tui_scope_guard::wide_scope_blocker(project_root, &task, scope.narrowed)
+    {
         app.add_message("system", message);
         return None;
     }
@@ -124,7 +131,6 @@ pub(crate) fn prepare_task(
     let run_id = app.next_run_id.saturating_add(1);
     app.next_run_id = run_id;
     app.active_run_id = Some(run_id);
-    let scope = crate::task_scope::resolve_task_scope(project_root, &task);
     app.begin_task_scoped(
         &task,
         &scope.launch_label,
@@ -202,19 +208,6 @@ fn persist_user_message(
                 .await;
         });
     }
-}
-
-fn task_start_blocker(app: &dsx_tui::App) -> Option<&'static str> {
-    if app.pending_approval.is_some() {
-        return Some("Agent is waiting for tool approval; answer it before starting a new task.");
-    }
-    if matches!(app.agent_task, dsx_tui::AgentTask::Running(_)) {
-        return Some("Agent is already running; wait for the current task to finish.");
-    }
-    if app.agent_abort.is_some() {
-        return Some("Agent is still stopping; wait for cleanup to finish.");
-    }
-    None
 }
 
 pub(crate) fn finish_task(
