@@ -58,6 +58,15 @@ pub(crate) fn prepare_agent_start_scope(
     Ok(crate::task_scope::resolve_task_scope(project_root, task))
 }
 
+pub(crate) fn blocked_agent_start_text(
+    project_root: &Path,
+    task: &str,
+    allow_wide_scope: bool,
+) -> Option<String> {
+    let preflight = build_agent_preflight(project_root, task, allow_wide_scope);
+    (!preflight.allowed()).then(|| render_text(&preflight))
+}
+
 pub(crate) fn build_agent_preflight(
     project_root: &Path,
     task: &str,

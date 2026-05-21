@@ -117,16 +117,13 @@ pub(crate) fn prepare_task(
         app.add_message("system", message);
         return None;
     }
-    let scope = crate::task_scope::resolve_task_scope(project_root, &task);
-    if let Some(message) = crate::scope_guard::wide_scope_blocker(
-        project_root,
-        &task,
-        scope.narrowed,
-        app.allow_wide_scope,
-    ) {
-        app.add_message("system", message);
+    if let Some(message) =
+        crate::agent_preflight::blocked_agent_start_text(project_root, &task, app.allow_wide_scope)
+    {
+        app.add_message("system", &message);
         return None;
     }
+    let scope = crate::task_scope::resolve_task_scope(project_root, &task);
     app.input.clear();
     app.scroll_offset = 0;
     let mode = dsx_core::types::PermissionMode::parse(&app.mode)

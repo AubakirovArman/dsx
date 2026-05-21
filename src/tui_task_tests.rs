@@ -91,6 +91,12 @@ mod tests {
                 .iter()
                 .any(|msg| msg.content.contains("Wide container workspace blocked"))
         );
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains("Agent preflight")
+                    && msg.content.contains("Decision: BLOCKED"))
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -79,6 +79,21 @@ mod tests {
     }
 
     #[test]
+    fn blocked_agent_start_text_renders_same_preflight_report() {
+        let root = temp_root("dsx_preflight_block_text");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+
+        let text =
+            crate::agent_preflight::blocked_agent_start_text(&root, "доработай проект", false)
+                .unwrap();
+
+        assert!(text.contains("Agent preflight"));
+        assert!(text.contains("Decision: BLOCKED"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn prepare_agent_start_scope_allows_policy_override() {
         let root = temp_root("dsx_preflight_start_scope_allow");
         let _ = std::fs::remove_dir_all(&root);
