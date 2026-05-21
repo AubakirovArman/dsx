@@ -19,7 +19,7 @@ pub fn status(cwd: &Path) -> anyhow::Result<String> {
 }
 
 pub fn diff(cwd: &Path) -> anyhow::Result<String> {
-    git(&["diff"], cwd)
+    git(&["diff", "--", "."], cwd)
 }
 
 pub fn diff_staged(cwd: &Path) -> anyhow::Result<String> {
@@ -38,7 +38,8 @@ pub fn checkpoint(label: &str, cwd: &Path) -> anyhow::Result<()> {
 pub fn rollback(cwd: &Path) -> anyhow::Result<String> {
     let last_msg = git(&["log", "-1", "--pretty=%B"], cwd)?;
     if last_msg.trim().starts_with("DSX checkpoint:") {
-        git(&["reset", "--hard", "HEAD"], cwd)?;
+        git(&["restore", "--source=HEAD", "--", "."], cwd)?;
+        git(&["clean", "-fd", "--", "."], cwd)?;
         Ok(format!(
             "Successfully restored checkpoint: {}",
             last_msg.trim()
@@ -104,5 +105,56 @@ mod tests {
         assert_eq!(final_content, "user changes");
 
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn rollback_from_subdir_preserves_sibling_changes() {
+        let tmp = std::env::temp_dir().join("dsx_git_scoped_rollback");
+        let child = tmp.join("child");
+        let sibling = tmp.join("sibling");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&child).unwrap();
+        std::fs::create_dir_all(&sibling).unwrap();
+
+        init_repo(&tmp);
+        std::fs::write(child.join("a.txt"), "initial child").unwrap();
+        std::fs::write(sibling.join("b.txt"), "initial sibling").unwrap();
+        git(&["add", "-A"], &tmp).unwrap();
+        git(&["commit", "-m", "initial commit"], &tmp).unwrap();
+
+        std::fs::write(child.join("a.txt"), "user child").unwrap();
+        std::fs::write(sibling.join("b.txt"), "user sibling").unwrap();
+        checkpoint("scoped", &tmp).unwrap();
+
+        std::fs::write(child.join("a.txt"), "agent child").unwrap();
+        std::fs::write(sibling.join("b.txt"), "agent sibling").unwrap();
+
+        rollback(&child).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(child.join("a.txt")).unwrap(),
+            "user child"
+        );
+        assert_eq!(
+            std::fs::read_to_string(sibling.join("b.txt")).unwrap(),
+            "agent sibling"
+        );
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    fn init_repo(tmp: &Path) {
+        let _ = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(tmp)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.name", "test"])
+            .current_dir(tmp)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(tmp)
+            .output();
     }
 }

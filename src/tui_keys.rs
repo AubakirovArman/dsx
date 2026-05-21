@@ -2,7 +2,7 @@
 
 use crate::tui_state::SharedApp;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::runtime::Handle;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,27 +118,37 @@ fn toggle(app: &SharedApp, f: impl FnOnce(&mut dsx_tui::App)) -> anyhow::Result<
 }
 
 fn toggle_diff(app: &SharedApp, project_root: &Path) -> anyhow::Result<KeyOutcome> {
+    let scope = active_scope_path(app, project_root);
     let mut app = app.lock().unwrap();
     if !app.show_diff {
-        app.current_diff = dsx_git::diff(project_root)
-            .unwrap_or_else(|_| "Error: Failed to fetch git diff.".into());
+        app.current_diff =
+            dsx_git::diff(&scope).unwrap_or_else(|_| "Error: Failed to fetch git diff.".into());
     }
     app.show_diff = !app.show_diff;
     Ok(KeyOutcome::Continue)
 }
 
 fn rollback(app: &SharedApp, project_root: &Path) -> anyhow::Result<KeyOutcome> {
+    let scope = active_scope_path(app, project_root);
     let mut app = app.lock().unwrap();
-    match dsx_git::rollback(project_root) {
+    match dsx_git::rollback(&scope) {
         Ok(msg) => {
-            app.add_message("system", &format!("⏪ Workspace Reverted: {msg}"));
-            if let Ok(files) = dsx_index::scan_project(project_root) {
+            app.add_message("system", &format!("⏪ Active Scope Reverted: {msg}"));
+            if let Ok(files) = dsx_index::scan_project(&scope) {
                 app.file_tree = files.into_iter().take(50).collect();
             }
         }
         Err(e) => app.add_message("error", &format!("🔒 Undo Failed: {e}")),
     }
     Ok(KeyOutcome::Continue)
+}
+
+pub(crate) fn active_scope_path(app: &SharedApp, project_root: &Path) -> PathBuf {
+    let active = app.lock().unwrap().scope_lock.active_scope.clone();
+    if active.trim().is_empty() {
+        return project_root.to_path_buf();
+    }
+    PathBuf::from(active)
 }
 
 fn scroll(app: &SharedApp, delta: i16) -> anyhow::Result<KeyOutcome> {
