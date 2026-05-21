@@ -58,6 +58,73 @@ pub async fn record_task_finished(
     dsx_memory::upsert_task_summary(&pool, &summary).await
 }
 
+pub async fn load_folder_notes(launch_root: &Path) -> Vec<dsx_tui::FolderNote> {
+    let Ok(entries) = std::fs::read_dir(launch_root) else {
+        return Vec::new();
+    };
+
+    let mut dirs = entries
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            note_candidate(&name).then_some((name, entry.path()))
+        })
+        .collect::<Vec<_>>();
+    dirs.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut notes = Vec::new();
+    for (name, path) in dirs.into_iter().take(12) {
+        let summary = load_child_summary(&path).await;
+        notes.push(folder_note(&name, summary.as_ref()));
+    }
+    notes
+}
+
+async fn load_child_summary(path: &Path) -> Option<dsx_memory::TaskSummary> {
+    let db_path = path.join(".dsx").join("sessions.db");
+    if !db_path.exists() {
+        return None;
+    }
+    let pool = dsx_memory::open(&db_path).await.ok()?;
+    let project_root = path.display().to_string();
+    dsx_memory::load_task_summary(&pool, &project_root)
+        .await
+        .ok()
+        .flatten()
+}
+
+fn folder_note(name: &str, summary: Option<&dsx_memory::TaskSummary>) -> dsx_tui::FolderNote {
+    dsx_tui::FolderNote {
+        folder: format!("{name}/"),
+        summary: truncate_note(
+            summary
+                .and_then(summary_text)
+                .unwrap_or_else(|| describe_dir(name)),
+        ),
+        next_step: truncate_note(
+            summary
+                .and_then(|summary| non_empty(&summary.next_step))
+                .unwrap_or("No saved task state yet."),
+        ),
+    }
+}
+
+fn summary_text(summary: &dsx_memory::TaskSummary) -> Option<&str> {
+    non_empty(&summary.last_changes)
+        .or_else(|| non_empty(&summary.done))
+        .or_else(|| non_empty(&summary.goal))
+}
+
+fn non_empty(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+fn note_candidate(name: &str) -> bool {
+    !matches!(name, ".git" | ".dsx" | "target") && !name.starts_with('.')
+}
+
 fn latest_tool_summary(
     brief: &dsx_tui::TaskBriefPanel,
     tools: &[dsx_tui::ToolTimelineEntry],
@@ -125,4 +192,14 @@ fn describe_dir(name: &str) -> &'static str {
         "target" => "build artifacts; normally ignored",
         _ => "project folder; open only for task-relevant details",
     }
+}
+
+fn truncate_note(value: impl AsRef<str>) -> String {
+    const LIMIT: usize = 140;
+    let value = value.as_ref();
+    let mut text: String = value.chars().take(LIMIT).collect();
+    if value.chars().count() > LIMIT {
+        text.push_str("...");
+    }
+    text
 }

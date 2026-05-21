@@ -64,4 +64,38 @@ mod tests {
         assert_eq!(app.scope_lock.status, "Wide");
         assert!(app.scope_lock.warning.contains("narrower folder"));
     }
+
+    #[test]
+    fn tool_result_updates_visible_folder_note() {
+        let mut app = App::new();
+        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites/1234", true);
+
+        app.handle_stream_event(&AgentStreamEvent::ToolResult {
+            name: "read_file".into(),
+            success: true,
+            summary: "inspected src/main.rs".into(),
+        });
+
+        let note = app
+            .folder_notes
+            .iter()
+            .find(|note| note.folder == "1234/")
+            .unwrap();
+        assert_eq!(note.summary, "inspected src/main.rs");
+        assert!(note.next_step.contains("Continue"));
+    }
+
+    #[test]
+    fn folder_note_cap_keeps_new_active_scope() {
+        let mut app = App::new();
+        for idx in 0..12 {
+            app.upsert_folder_note(&format!("/tmp/sites/p{idx}"), "old", "next");
+        }
+
+        app.upsert_folder_note("/tmp/sites/new", "fresh", "verify");
+
+        assert_eq!(app.folder_notes.len(), 12);
+        assert!(app.folder_notes.iter().any(|note| note.folder == "new/"));
+        assert!(!app.folder_notes.iter().any(|note| note.folder == "p0/"));
+    }
 }

@@ -33,6 +33,8 @@ pub async fn run_tui(
         api_key.clone(),
         history,
     );
+    let folder_notes = crate::session_state::load_folder_notes(&project_root).await;
+    app.lock().unwrap().set_folder_notes(folder_notes);
     let result = event_loop(
         &mut terminal,
         app,

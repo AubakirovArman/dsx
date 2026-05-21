@@ -85,6 +85,13 @@ impl Default for ScopeLockPanel {
 }
 
 #[derive(Debug, Clone)]
+pub struct FolderNote {
+    pub folder: String,
+    pub summary: String,
+    pub next_step: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ToolTimelineEntry {
     pub name: String,
     pub status: String,

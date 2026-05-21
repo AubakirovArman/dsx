@@ -34,6 +34,23 @@ impl App {
     }
 
     fn draw_workflow_panel(&self, frame: &mut Frame, area: Rect) {
+        if area.height >= 24 {
+            let split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(34),
+                    Constraint::Length(8),
+                    Constraint::Length(7),
+                    Constraint::Min(6),
+                ])
+                .split(area);
+            self.draw_task_brief_panel(frame, split[0]);
+            self.draw_scope_lock_panel(frame, split[1]);
+            self.draw_folder_notes_panel(frame, split[2]);
+            self.draw_tool_timeline_panel(frame, split[3]);
+            return;
+        }
+
         let split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -69,6 +86,49 @@ impl App {
                         " Plan / Done ",
                         Style::default()
                             .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    )),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, area);
+    }
+
+    fn draw_folder_notes_panel(&self, frame: &mut Frame, area: Rect) {
+        let mut lines = Vec::new();
+        if self.folder_notes.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                "No folder summaries yet.",
+                Style::default().fg(Color::DarkGray),
+            )]));
+        } else {
+            for note in self.folder_notes.iter().take(4) {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        note.folder.as_str(),
+                        Style::default()
+                            .fg(Color::LightBlue)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(note.summary.as_str(), Style::default().fg(Color::White)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::raw("  next: "),
+                    Span::styled(note.next_step.as_str(), Style::default().fg(Color::Gray)),
+                ]));
+            }
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Blue))
+                    .title(Span::styled(
+                        " Folder Notes ",
+                        Style::default()
+                            .fg(Color::LightBlue)
                             .add_modifier(Modifier::BOLD),
                     )),
             )

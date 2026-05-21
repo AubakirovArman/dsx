@@ -8,12 +8,13 @@ pub mod draw_input;
 pub mod draw_settings;
 pub mod draw_status;
 pub mod draw_workflow;
+pub mod folder_notes;
 pub mod i18n;
 pub mod types;
 
 pub use types::{
-    AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval, ScopeLockPanel,
-    TaskBriefPanel, ToolTimelineEntry,
+    AgentStreamEvent, AgentTask, ChatMessage, FolderNote, Language, PendingApproval,
+    ScopeLockPanel, TaskBriefPanel, ToolTimelineEntry,
 };
 
 /// Shared app state.
@@ -50,6 +51,7 @@ pub struct App {
     pub estimated_tokens_saved: u64,
     pub task_brief: TaskBriefPanel,
     pub scope_lock: ScopeLockPanel,
+    pub folder_notes: Vec<FolderNote>,
     pub tool_timeline: Vec<ToolTimelineEntry>,
 }
 
@@ -107,6 +109,7 @@ impl App {
             estimated_tokens_saved: 0,
             task_brief: TaskBriefPanel::default(),
             scope_lock: ScopeLockPanel::default(),
+            folder_notes: Vec::new(),
             tool_timeline: Vec::new(),
         }
     }
@@ -230,6 +233,8 @@ impl App {
                 "Review the task if you expected a narrower folder like ./1234.".into()
             },
         };
+        let next_step = self.task_brief.next_step.clone();
+        self.upsert_folder_note(active_scope, "Task accepted in this folder.", &next_step);
         self.tool_timeline.clear();
         self.compaction_events = 0;
         self.compacted_messages = 0;
@@ -261,6 +266,9 @@ impl App {
         } else {
             "Review failed tool output before continuing.".into()
         };
+        let active = self.task_brief.active_scope.clone();
+        let next_step = self.task_brief.next_step.clone();
+        self.upsert_folder_note(&active, summary, &next_step);
     }
 }
 

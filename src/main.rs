@@ -6,6 +6,8 @@ pub mod event_convert;
 pub mod handlers;
 pub mod run_ledger;
 pub mod session_state;
+#[cfg(test)]
+mod session_state_tests;
 pub mod task_scope;
 #[cfg(test)]
 mod task_scope_tests;
