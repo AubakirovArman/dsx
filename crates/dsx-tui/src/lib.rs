@@ -2,10 +2,14 @@
 
 pub mod draw;
 pub mod draw_settings;
+pub mod draw_workflow;
 pub mod i18n;
 pub mod types;
 
-pub use types::{AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval};
+pub use types::{
+    AgentStreamEvent, AgentTask, ChatMessage, Language, PendingApproval, TaskBriefPanel,
+    ToolTimelineEntry,
+};
 
 /// Shared app state.
 pub struct App {
@@ -29,6 +33,8 @@ pub struct App {
     pub lang: Language,
     pub api_base: String,
     pub api_key: String,
+    pub task_brief: TaskBriefPanel,
+    pub tool_timeline: Vec<ToolTimelineEntry>,
 }
 
 impl App {
@@ -73,6 +79,8 @@ impl App {
             lang: initial_lang,
             api_base: "https://api.deepseek.com".to_string(),
             api_key: String::new(),
+            task_brief: TaskBriefPanel::default(),
+            tool_timeline: Vec::new(),
         }
     }
 
@@ -111,6 +119,7 @@ impl App {
             } => {
                 let status = if *success { "✓" } else { "✗" };
                 let short: String = summary.chars().take(150).collect();
+                self.push_tool_event(name, *success, &short);
                 self.add_message("tool", &format!("{status} {name} — {short}"));
             }
             AgentStreamEvent::Done {
@@ -124,13 +133,32 @@ impl App {
                 self.current_reasoning.clear();
                 self.agent_task =
                     AgentTask::Done(format!("{} iterations, ${:.4}", iterations, cost));
+                self.task_brief.done = format!("Completed in {iterations} iteration(s).");
+                self.task_brief.last_changes = "Final assistant response recorded.".into();
+                self.task_brief.next_step = "Review result or enter the next task.".into();
             }
             AgentStreamEvent::Error(err) => {
                 self.add_message("error", err);
                 self.current_reasoning.clear();
                 self.agent_task = AgentTask::Error(err.clone());
+                self.task_brief.done = "Run failed.".into();
+                self.task_brief.last_changes = err.chars().take(220).collect();
+                self.task_brief.next_step =
+                    "Inspect the error and retry with a narrower task.".into();
             }
         }
+    }
+
+    pub fn begin_task(&mut self, task: &str, active_scope: &str) {
+        self.task_brief = TaskBriefPanel {
+            goal: truncate_chars(task, 260),
+            done: "Task accepted; context brief prepared.".into(),
+            plan: "1. Stay inside active scope\n2. Inspect only needed files\n3. Apply scoped changes\n4. Verify and summarize".into(),
+            last_changes: "No tool result yet.".into(),
+            next_step: "Waiting for first model/tool event.".into(),
+            active_scope: active_scope.into(),
+        };
+        self.tool_timeline.clear();
     }
 
     pub fn add_message(&mut self, role: &str, content: &str) {
@@ -139,10 +167,38 @@ impl App {
             content: content.into(),
         });
     }
+
+    fn push_tool_event(&mut self, name: &str, success: bool, summary: &str) {
+        let status = if success { "ok" } else { "failed" };
+        self.tool_timeline.push(ToolTimelineEntry {
+            name: name.into(),
+            status: status.into(),
+            summary: summary.into(),
+        });
+        if self.tool_timeline.len() > 20 {
+            let overflow = self.tool_timeline.len() - 20;
+            self.tool_timeline.drain(0..overflow);
+        }
+        self.task_brief.done = format!("Tool {name} finished with status {status}.");
+        self.task_brief.last_changes = summary.into();
+        self.task_brief.next_step = if success {
+            "Continue from the latest tool result.".into()
+        } else {
+            "Review failed tool output before continuing.".into()
+        };
+    }
 }
 
 impl Default for App {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn truncate_chars(value: &str, limit: usize) -> String {
+    let mut text: String = value.chars().take(limit).collect();
+    if value.chars().count() > limit {
+        text.push_str("...");
+    }
+    text
 }

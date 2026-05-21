@@ -140,6 +140,37 @@ impl SessionManager {
             })
             .collect())
     }
+
+    /// Retrieve the latest events without loading an entire long session.
+    pub async fn get_recent_events(
+        &self,
+        session_id: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<Event>> {
+        let rows = sqlx::query_as::<_, EventRow>(
+            "SELECT id, session_id, ts, type, data_json
+             FROM events
+             WHERE session_id = ?
+             ORDER BY ts DESC
+             LIMIT ?",
+        )
+        .bind(session_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut events = rows
+            .into_iter()
+            .map(|r| Event {
+                id: r.id,
+                session_id: r.session_id,
+                ts: r.ts,
+                type_: r.type_,
+                data_json: r.data_json,
+            })
+            .collect::<Vec<_>>();
+        events.reverse();
+        Ok(events)
+    }
 }
 
 #[derive(sqlx::FromRow)]

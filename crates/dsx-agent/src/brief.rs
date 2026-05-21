@@ -20,6 +20,7 @@ pub fn clean_task_input(task: &str) -> String {
 }
 
 pub fn build_task_brief(task: &str, scope: &TaskScope, ctx: &AgentContext) -> String {
+    let state = ctx.task_summary.as_ref();
     let files = ctx
         .file_tree
         .iter()
@@ -33,18 +34,68 @@ pub fn build_task_brief(task: &str, scope: &TaskScope, ctx: &AgentContext) -> St
         files
     };
 
+    let goal = field_or(state.map(|s| s.goal.as_str()), task);
+    let done = field_or(
+        state.map(|s| s.done.as_str()),
+        "Nothing in this run yet. Update from tool results only.",
+    );
+    let plan = field_or(
+        state.map(|s| s.plan.as_str()),
+        "1. Inspect only the active task scope.\n2. Make the smallest scoped changes.\n3. Verify with focused commands/tests.",
+    );
+    let last_changes = field_or(
+        state.map(|s| s.last_changes.as_str()),
+        "Use the git status/diff below; do not infer uninspected file contents.",
+    );
+    let next_step = field_or(
+        state.map(|s| s.next_step.as_str()),
+        "Start scoped inspection.",
+    );
+    let active_scope = field_or(
+        state.map(|s| s.active_scope.as_str()),
+        &scope.active_root.display().to_string(),
+    );
+    let constraints = field_or(
+        state.map(|s| s.constraints.as_str()),
+        "- Active scope is a hard boundary.\n- Keep source files at 300 lines or fewer; split into modules/components.\n- Keep responses compact; do not repeat old conversation.",
+    );
+    let architecture = field_or(state.map(|s| s.architecture.as_str()), &files);
+
     format!(
         "Compact task brief:\n\
-         Goal:\n  {task}\n\
-         Done:\n  Nothing in this run yet. Update from tool results only.\n\
-         Plan:\n  1. Inspect only the active task scope.\n  2. Make the smallest scoped changes.\n  3. Verify with focused commands/tests.\n\
-         Last changes:\n  Use the git status/diff below; do not infer uninspected file contents.\n\
-         Active scope:\n  {}\n\
-         Constraints:\n  - Active scope is a hard boundary.\n  - Keep source files at 300 lines or fewer; split into modules/components.\n  - Keep responses compact; do not repeat old conversation.\n\
+         Goal:\n{}\n\
+         Done:\n{}\n\
+         Plan:\n{}\n\
+         Last changes:\n{}\n\
+         Next step:\n{}\n\
+         Active scope:\n{}\n\
+         Constraints:\n{}\n\
          Surface architecture:\n{}",
-        scope.active_root.display(),
-        files
+        indent(&goal),
+        indent(&done),
+        indent(&plan),
+        indent(&last_changes),
+        indent(&next_step),
+        indent(&active_scope),
+        indent(&constraints),
+        indent(&architecture)
     )
+}
+
+fn field_or(value: Option<&str>, fallback: &str) -> String {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn indent(value: &str) -> String {
+    value
+        .lines()
+        .map(|line| format!("  {}", line.trim_end()))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn is_ui_noise_line(line: &str) -> bool {
@@ -91,6 +142,7 @@ mod tests {
             git_diff: String::new(),
             file_tree: vec!["Cargo.toml".into()],
             memories: Vec::new(),
+            task_summary: None,
             max_tokens: 1000,
         };
 
@@ -102,6 +154,35 @@ mod tests {
         assert!(brief.contains("Last changes:"));
         assert!(brief.contains("Active scope:"));
         assert!(brief.contains("300 lines"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn brief_prefers_persisted_task_state() {
+        let root = std::env::temp_dir().join("dsx_brief_state");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let scope = resolve_task_scope(&root, "build").unwrap();
+        let mut summary = dsx_context::TaskSummary::new(&root.display().to_string());
+        summary.goal = "persisted goal".into();
+        summary.done = "persisted done".into();
+        summary.next_step = "persisted next".into();
+        let ctx = AgentContext {
+            project_root: root.display().to_string(),
+            git_status: String::new(),
+            git_diff: String::new(),
+            file_tree: vec!["Cargo.toml".into()],
+            memories: Vec::new(),
+            task_summary: Some(summary),
+            max_tokens: 1000,
+        };
+
+        let brief = build_task_brief("new task", &scope, &ctx);
+
+        assert!(brief.contains("persisted goal"));
+        assert!(brief.contains("persisted done"));
+        assert!(brief.contains("persisted next"));
 
         let _ = std::fs::remove_dir_all(&root);
     }

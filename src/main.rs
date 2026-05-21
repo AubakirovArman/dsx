@@ -2,6 +2,7 @@
 
 pub mod cli;
 pub mod handlers;
+pub mod session_state;
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -193,7 +194,10 @@ async fn run_tui(
     let app = Arc::new(Mutex::new(dsx_tui::App::new()));
     let history_events = if let (Some(sid), Some(p)) = (session_id.clone(), pool.clone()) {
         let sm = dsx_session::SessionManager::new(p);
-        sm.get_events(&sid).await.ok().map(|events| (sid, events))
+        sm.get_recent_events(&sid, 24)
+            .await
+            .ok()
+            .map(|events| (sid, events))
     } else {
         None
     };
@@ -233,11 +237,14 @@ async fn run_tui(
                     if let Ok(data) = serde_json::from_str::<serde_json::Value>(&e.data_json) {
                         if e.type_ == "user_msg" {
                             if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
-                                a.add_message("user", content);
+                                a.add_message("user", &session_state::history_excerpt(content));
                             }
                         } else if e.type_ == "assistant_msg" {
                             if let Some(content) = data.get("content").and_then(|v| v.as_str()) {
-                                a.add_message("assistant", content);
+                                a.add_message(
+                                    "assistant",
+                                    &session_state::history_excerpt(content),
+                                );
                             }
                             if let Some(cost) = data.get("cost").and_then(|v| v.as_f64()) {
                                 a.cost = cost;
@@ -568,6 +575,7 @@ async fn run_tui(
                         let task: String;
                         let api_key_copy: String;
                         let project_root_copy: PathBuf;
+                        let active_root: PathBuf;
                         let current_mode: dsx_core::types::PermissionMode;
                         {
                             let mut a = app.lock().unwrap();
@@ -579,11 +587,18 @@ async fn run_tui(
                             }
                             current_mode = dsx_core::types::PermissionMode::parse(&a.mode)
                                 .unwrap_or(dsx_core::types::PermissionMode::Ask);
+                            active_root =
+                                dsx_agent::scope::resolve_task_scope(&project_root, &task)
+                                    .map(|scope| scope.active_root)
+                                    .unwrap_or_else(|_| project_root.clone());
+                            a.begin_task(&task, &active_root.display().to_string());
                             a.add_message("user", &task);
                             a.agent_task = dsx_tui::AgentTask::Running(task.clone());
                             api_key_copy = api_key.clone();
                             project_root_copy = project_root.clone();
                         }
+
+                        let _ = session_state::record_task_started(&active_root, &task).await;
 
                         // Persist user message to SQLite in background
                         if let (Some(ref sid), Some(ref p)) = (session_id.clone(), pool.clone()) {
@@ -641,6 +656,7 @@ async fn run_tui(
                         let session_id_opt = session_id.clone();
                         let pool_opt = pool.clone();
                         let rt_copy = rt.clone();
+                        let active_root_for_summary = active_root.clone();
                         rt.spawn(async move {
                             while let Some(event) = rx.recv().await {
                                 let tui_event = convert_event(&event);
@@ -650,6 +666,17 @@ async fn run_tui(
                             // Agent finished
                             let mut a = app_loop2.lock().unwrap();
                             a.agent_task = dsx_tui::AgentTask::Done("ready".into());
+                            let brief_snapshot = a.task_brief.clone();
+                            let tools_snapshot = a.tool_timeline.clone();
+                            let summary_root = active_root_for_summary.clone();
+                            rt_copy.spawn(async move {
+                                let _ = session_state::record_task_finished(
+                                    &summary_root,
+                                    &brief_snapshot,
+                                    &tools_snapshot,
+                                )
+                                .await;
+                            });
 
                             // Persist assistant message to SQLite
                             if let Some(last_msg) = a.messages.last() {

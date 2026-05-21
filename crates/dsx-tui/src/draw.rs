@@ -66,7 +66,7 @@ impl App {
         } else if self.show_settings {
             self.draw_settings(frame, main_workspace_area);
         } else {
-            self.draw_chat(frame, main_workspace_area);
+            self.draw_workspace(frame, main_workspace_area);
         }
 
         self.draw_input(frame, main[1]);

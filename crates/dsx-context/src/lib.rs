@@ -4,6 +4,8 @@
 
 use std::path::Path;
 
+pub use dsx_memory::TaskSummary;
+
 pub struct ContextManager;
 
 #[derive(Debug, Clone)]
@@ -13,6 +15,7 @@ pub struct AgentContext {
     pub git_diff: String,
     pub file_tree: Vec<String>,
     pub memories: Vec<String>,
+    pub task_summary: Option<dsx_memory::TaskSummary>,
     pub max_tokens: u64,
 }
 
@@ -31,6 +34,7 @@ impl ContextManager {
         let git_diff = dsx_git::diff(project_root).unwrap_or_default();
         let file_tree = dsx_fs::list_files(project_root)?;
         let memories = load_memories(project_root).await.unwrap_or_default();
+        let task_summary = load_task_summary(project_root).await.unwrap_or_default();
 
         Ok(AgentContext {
             project_root: project_root.display().to_string(),
@@ -38,6 +42,7 @@ impl ContextManager {
             git_diff,
             file_tree,
             memories,
+            task_summary,
             max_tokens,
         })
     }
@@ -85,6 +90,15 @@ pub fn format_context(ctx: &AgentContext) -> String {
             buf.push_str(&format!("  {memory}\n"));
         }
     }
+    if let Some(summary) = &ctx.task_summary {
+        let compact = summary.compact_text();
+        if !compact.is_empty() {
+            buf.push_str("Compact task state:\n");
+            for line in compact.lines() {
+                buf.push_str(&format!("  {line}\n"));
+            }
+        }
+    }
     buf
 }
 
@@ -106,4 +120,15 @@ async fn load_memories(project_root: &Path) -> anyhow::Result<Vec<String>> {
             )
         })
         .collect())
+}
+
+async fn load_task_summary(project_root: &Path) -> anyhow::Result<Option<dsx_memory::TaskSummary>> {
+    let db_path = project_root.join(".dsx").join("sessions.db");
+    if !db_path.exists() {
+        return Ok(None);
+    }
+
+    let pool = dsx_memory::open(&db_path).await?;
+    let project_root_str = project_root.display().to_string();
+    dsx_memory::load_task_summary(&pool, &project_root_str).await
 }

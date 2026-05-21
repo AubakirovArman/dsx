@@ -7,6 +7,10 @@
 use sqlx::SqlitePool;
 use std::path::Path;
 
+pub mod task_summary;
+
+pub use task_summary::{TaskSummary, load_task_summary, upsert_task_summary};
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MemoryItem {
     pub id: String,
@@ -83,6 +87,19 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
             updated_at TEXT NOT NULL,
             expires_at TEXT,
             archived INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS task_summaries (
+            project_root TEXT PRIMARY KEY,
+            goal TEXT NOT NULL DEFAULT '',
+            done TEXT NOT NULL DEFAULT '',
+            plan TEXT NOT NULL DEFAULT '',
+            last_changes TEXT NOT NULL DEFAULT '',
+            next_step TEXT NOT NULL DEFAULT '',
+            active_scope TEXT NOT NULL DEFAULT '',
+            constraints TEXT NOT NULL DEFAULT '',
+            architecture TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS file_summaries (
