@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
 use handlers::{
     list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
-    run_mcp_list, run_plan,
+    run_mcp_list, run_plan, task_preview,
 };
 
 #[tokio::main]
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
             };
-            println!("Planning: {desc}");
+            println!("Planning: {}", task_preview(&desc));
             run_plan(project_root, key, api_base, &desc, mode).await?;
         }
 
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
             };
-            println!("Editing: {desc}");
+            println!("Editing: {}", task_preview(&desc));
             run_edit(project_root, key, api_base, &desc, mode).await?;
         }
 

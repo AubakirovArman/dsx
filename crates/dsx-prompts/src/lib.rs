@@ -31,6 +31,8 @@ Rules:
 - Do not assume file contents; always verify with read_file.
 - Do not write directly outside the workspace.
 - Treat the active task scope as a hard boundary. If the user names a subfolder, only inspect and modify that subfolder unless they explicitly expand scope.
+- Keep a compact working brief in your own response structure: Goal, Done, Plan, Last changes, Next step. Do not repeat old conversation or paste broad workspace listings.
+- Keep source files at 300 lines or fewer. Split larger implementations into modules/components before a file grows past that limit.
 - Respect the active permission mode.
 - Ask for approval before risky commands, destructive operations, network access, dependency installs, git reset/clean, or secrets-related actions.
 - Cite file paths and line ranges when possible.

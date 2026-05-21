@@ -1,6 +1,7 @@
 //! DSX Agent — synchronous block-on runner.
 
 use crate::build_tool_defs;
+use crate::tool_defs::compact_tool_content;
 use crate::types::{AgentConfig, AgentOutcome, ToolResult};
 use dsx_provider::streaming::StreamEvent;
 use dsx_provider::types::{
@@ -16,6 +17,7 @@ const FLASH_OUTPUT_COST: f64 = 0.28;
 /// Execute a natural language task and block until a final answer is returned.
 pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcome> {
     let scope = crate::scope::resolve_task_scope(&config.project_root, task)?;
+    let clean_task = crate::brief::clean_task_input(task);
     let project_root = &scope.active_root;
     let client = dsx_provider::client::DeepSeekClient::new_with_base(
         config.api_key.clone(),
@@ -23,7 +25,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
     );
 
     // Step 1: Classify the task
-    let route = crate::classify::classify(task, &config.api_key, &config.api_base).await?;
+    let route = crate::classify::classify(&clean_task, &config.api_key, &config.api_base).await?;
     tracing::info!(route = ?route, "Task classified");
 
     // Step 2: Collect project context
@@ -31,6 +33,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
         .collect(project_root, 250_000)
         .await?;
     let context_str = dsx_context::format_context(&ctx);
+    let task_brief = crate::brief::build_task_brief(&clean_task, &scope, &ctx);
 
     // Step 3: Build system prompt (static)
     let system_prompt = dsx_prompts::lead_agent();
@@ -58,6 +61,13 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             tool_call_id: None,
             reasoning_content: None,
         },
+        Message {
+            role: "system".into(),
+            content: Some(task_brief),
+            tool_calls: None,
+            tool_call_id: None,
+            reasoning_content: None,
+        },
     ];
 
     if let Some(instructions) = dsx_context::load_project_instructions(project_root) {
@@ -72,7 +82,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
 
     messages.push(Message {
         role: "user".into(),
-        content: Some(task.to_string()),
+        content: Some(clean_task),
         tool_calls: None,
         tool_call_id: None,
         reasoning_content: None,
@@ -107,6 +117,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
                 include_usage: true,
             }),
         };
+        crate::budget::check_request(&request)?;
 
         // Stream and collect events
         let events = client.chat_stream_events(&request).await?;
@@ -158,6 +169,11 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             if let Some(rt) = u.reasoning_tokens {
                 total_reasoning_tokens = rt as u64;
             }
+            crate::budget::check_run_usage(
+                model_name,
+                total_prompt_tokens,
+                total_completion_tokens,
+            )?;
         }
 
         // Commit reasoning/content to conversation history
@@ -174,11 +190,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
                 Some(finish_calls)
             },
             tool_call_id: None,
-            reasoning_content: if reasoning.is_empty() {
-                None
-            } else {
-                Some(reasoning)
-            },
+            reasoning_content: None,
         });
 
         // Break if finished without further tool calls
@@ -204,7 +216,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             all_tool_results.push(result.clone());
             tool_msgs.push(Message {
                 role: "tool".into(),
-                content: Some(result.content),
+                content: Some(compact_tool_content(&result)),
                 tool_calls: None,
                 tool_call_id: Some(tc.id.clone()),
                 reasoning_content: None,

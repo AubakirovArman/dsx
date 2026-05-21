@@ -54,6 +54,7 @@ Return JSON format:
         max_tokens: Some(500),
         stream_options: None,
     };
+    crate::budget::check_request(&request)?;
 
     // Fail-safe HTTP request block
     let response_text = match client.chat(&request).await {

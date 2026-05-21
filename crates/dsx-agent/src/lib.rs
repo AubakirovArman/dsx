@@ -1,5 +1,7 @@
 //! DSX Agent — ReAct-based orchestration and streaming execution.
 
+pub mod brief;
+pub mod budget;
 pub mod classify;
 pub mod runner_sync;
 pub mod scope;
@@ -19,7 +21,7 @@ use dsx_provider::types::{
     ChatRequest, FunctionCall, Message, StreamOptions, ThinkingConfig, ToolCall,
 };
 use tokio::sync::mpsc;
-use tool_defs::{summarize_tool_result, summarize_tool_results};
+use tool_defs::{compact_tool_content, summarize_tool_result, summarize_tool_results};
 
 // Pricing per 1M tokens (May 2026)
 const PRO_INPUT_COST: f64 = 1.74;
@@ -57,16 +59,18 @@ async fn run_streaming_internal(
     tx: mpsc::UnboundedSender<StreamEvent>,
 ) -> anyhow::Result<AgentOutcome> {
     let scope = scope::resolve_task_scope(&config.project_root, task)?;
+    let clean_task = brief::clean_task_input(task);
     let project_root = &scope.active_root;
     let client = dsx_provider::client::DeepSeekClient::new_with_base(
         config.api_key.clone(),
         config.api_base.clone(),
     );
-    let route = classify(task, &config.api_key, &config.api_base).await?;
+    let route = classify(&clean_task, &config.api_key, &config.api_base).await?;
     let ctx = dsx_context::ContextManager::new()
         .collect(project_root, 250_000)
         .await?;
     let context_str = dsx_context::format_context(&ctx);
+    let task_brief = brief::build_task_brief(&clean_task, &scope, &ctx);
     let system_prompt = dsx_prompts::lead_agent();
     let tools = build_tool_defs();
     let (model_name, thinking, effort) = dsx_provider::model_config(route);
@@ -90,6 +94,13 @@ async fn run_streaming_internal(
             tool_call_id: None,
             reasoning_content: None,
         },
+        Message {
+            role: "system".into(),
+            content: Some(task_brief),
+            tool_calls: None,
+            tool_call_id: None,
+            reasoning_content: None,
+        },
     ];
 
     if let Some(instructions) = dsx_context::load_project_instructions(project_root) {
@@ -104,7 +115,7 @@ async fn run_streaming_internal(
 
     messages.push(Message {
         role: "user".into(),
-        content: Some(task.to_string()),
+        content: Some(clean_task),
         tool_calls: None,
         tool_call_id: None,
         reasoning_content: None,
@@ -137,6 +148,7 @@ async fn run_streaming_internal(
                 include_usage: true,
             }),
         };
+        budget::check_request(&request)?;
 
         // Use callback-based streaming — events go to TUI in real-time
         let tx_clone = tx.clone();
@@ -194,6 +206,7 @@ async fn run_streaming_internal(
             if let Some(rt) = u.reasoning_tokens {
                 total_reasoning = rt as u64;
             }
+            budget::check_run_usage(model_name, total_prompt, total_completion)?;
         }
 
         messages.push(Message {
@@ -209,11 +222,7 @@ async fn run_streaming_internal(
                 Some(finish_calls)
             },
             tool_call_id: None,
-            reasoning_content: if reasoning.is_empty() {
-                None
-            } else {
-                Some(reasoning)
-            },
+            reasoning_content: None,
         });
 
         let is_last = i + 1 >= config.max_iterations;
@@ -245,7 +254,7 @@ async fn run_streaming_internal(
             if !is_last {
                 tool_msgs.push(Message {
                     role: "tool".into(),
-                    content: Some(result.content),
+                    content: Some(compact_tool_content(&result)),
                     tool_calls: None,
                     tool_call_id: Some(tc.id.clone()),
                     reasoning_content: None,

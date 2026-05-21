@@ -3,6 +3,8 @@
 use crate::types::ToolResult;
 use dsx_provider::types::{FunctionDef, ToolDef};
 
+const MAX_TOOL_MESSAGE_CHARS: usize = 12_000;
+
 pub fn summarize_tool_result(result: &ToolResult) -> String {
     let mut summary: String = result.content.chars().take(300).collect();
     if result.content.chars().count() > 300 {
@@ -27,6 +29,20 @@ pub fn summarize_tool_results(results: &[ToolResult]) -> String {
         })
         .collect::<Vec<_>>()
         .join(" | ")
+}
+
+pub fn compact_tool_content(result: &ToolResult) -> String {
+    let mut content: String = result
+        .content
+        .chars()
+        .take(MAX_TOOL_MESSAGE_CHARS)
+        .collect();
+    if result.content.chars().count() > MAX_TOOL_MESSAGE_CHARS {
+        content.push_str(&format!(
+            "\n... [tool output truncated at {MAX_TOOL_MESSAGE_CHARS} chars; ask for a narrower read/search if more detail is needed]"
+        ));
+    }
+    content
 }
 
 pub fn build_tool_defs() -> Vec<ToolDef> {

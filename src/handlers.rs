@@ -190,6 +190,16 @@ fn parse_eval_tasks(content: &str) -> anyhow::Result<Vec<dsx_eval::EvalTask>> {
     }
 }
 
+pub fn task_preview(task: &str) -> String {
+    const MAX_CHARS: usize = 240;
+    let cleaned = dsx_agent::brief::clean_task_input(task);
+    let mut preview: String = cleaned.chars().take(MAX_CHARS).collect();
+    if cleaned.chars().count() > MAX_CHARS {
+        preview.push_str("...");
+    }
+    preview
+}
+
 pub async fn list_sessions(project_root: &Path) {
     let db_path = project_root.join(".dsx").join("sessions.db");
     match dsx_memory::open(&db_path).await {
