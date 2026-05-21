@@ -21,7 +21,7 @@ pub fn exec_read_file(id: &str, args: &serde_json::Value, ctx: &ToolContext) -> 
             },
             Err(e) => read_error(id, "read_file", format!("Error reading {path}: {e}")),
         },
-        Err(e) => read_error(id, "read_file", format!("Path error: {e}")),
+        Err(e) => path_error(id, "read_file", RiskLevel::Read, e.to_string()),
     }
 }
 
@@ -29,7 +29,7 @@ pub fn exec_list_files(id: &str, args: &serde_json::Value, ctx: &ToolContext) ->
     let subdir = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
     let target = match dsx_fs::resolve_path(&ctx.workspace, subdir) {
         Ok(path) => path,
-        Err(e) => return read_error(id, "list_files", format!("Path error: {e}")),
+        Err(e) => return path_error(id, "list_files", RiskLevel::Read, e.to_string()),
     };
 
     match dsx_fs::list_files(&target) {
@@ -50,7 +50,7 @@ pub fn exec_grep(id: &str, args: &serde_json::Value, ctx: &ToolContext) -> ToolR
     let subdir = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
     let target = match dsx_fs::resolve_path(&ctx.workspace, subdir) {
         Ok(path) => path,
-        Err(e) => return read_error(id, "grep", format!("Path error: {e}")),
+        Err(e) => return path_error(id, "grep", RiskLevel::Read, e.to_string()),
     };
     if pattern.is_empty() {
         return read_error(id, "grep", "Error: pattern is required".into());
@@ -88,7 +88,7 @@ pub fn exec_write_file(id: &str, args: &serde_json::Value, ctx: &ToolContext) ->
 
     let full_path = match dsx_fs::resolve_path_allow_missing(&ctx.workspace, path) {
         Ok(path) => path,
-        Err(e) => return medium_error(id, "write_file", format!("Path error: {e}")),
+        Err(e) => return path_error(id, "write_file", RiskLevel::Medium, e.to_string()),
     };
     if full_path.exists() && !overwrite {
         return medium_error(
@@ -158,6 +158,27 @@ fn read_error(id: &str, name: &str, content: String) -> ToolResult {
         content,
         success: false,
         risk: RiskLevel::Read,
+        denied: false,
+    }
+}
+
+fn path_error(id: &str, name: &str, fallback_risk: RiskLevel, error: String) -> ToolResult {
+    if super::is_scope_error_text(&error) {
+        return ToolResult {
+            tool_call_id: id.into(),
+            name: name.into(),
+            content: format!("Path denied by active scope: {error}"),
+            success: false,
+            risk: RiskLevel::Blocked,
+            denied: true,
+        };
+    }
+    ToolResult {
+        tool_call_id: id.into(),
+        name: name.into(),
+        content: format!("Path error: {error}"),
+        success: false,
+        risk: fallback_risk,
         denied: false,
     }
 }

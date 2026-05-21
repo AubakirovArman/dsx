@@ -15,17 +15,21 @@ pub fn exec_propose_patch(id: &str, args: &serde_json::Value, ctx: &ToolContext)
             "Error: 'changes' array is required".into(),
             false,
             RiskLevel::Medium,
+            false,
         );
     };
 
     let mut results = Vec::new();
     let mut all_succeeded = true;
+    let mut denied = false;
     let mut new_contents: Vec<(std::path::PathBuf, String)> = Vec::new();
 
     for change_val in changes {
-        if !stage_change(ctx, change_val, &mut results, &mut new_contents) {
+        let outcome = stage_change(ctx, change_val, &mut results, &mut new_contents);
+        if !outcome.succeeded {
             all_succeeded = false;
         }
+        denied |= outcome.denied;
     }
 
     if all_succeeded {
@@ -41,8 +45,18 @@ pub fn exec_propose_patch(id: &str, args: &serde_json::Value, ctx: &ToolContext)
         id,
         format!("Patch proposal: {summary}\n\n{}", results.join("\n")),
         all_succeeded,
-        RiskLevel::Medium,
+        if denied {
+            RiskLevel::Blocked
+        } else {
+            RiskLevel::Medium
+        },
+        denied,
     )
+}
+
+struct StageOutcome {
+    succeeded: bool,
+    denied: bool,
 }
 
 fn stage_change(
@@ -50,7 +64,7 @@ fn stage_change(
     change_val: &serde_json::Value,
     results: &mut Vec<String>,
     new_contents: &mut Vec<(std::path::PathBuf, String)>,
-) -> bool {
+) -> StageOutcome {
     let path = change_val
         .get("path")
         .and_then(|v| v.as_str())
@@ -72,15 +86,29 @@ fn stage_change(
     let full_path = match dsx_fs::resolve_path(&ctx.workspace, path) {
         Ok(path) => path,
         Err(e) => {
-            results.push(format!("✗ {path}: path error — {e}"));
-            return false;
+            let error = e.to_string();
+            if super::is_scope_error_text(&error) {
+                results.push(format!("✗ {path}: denied by active scope — {error}"));
+                return StageOutcome {
+                    succeeded: false,
+                    denied: true,
+                };
+            }
+            results.push(format!("✗ {path}: path error — {error}"));
+            return StageOutcome {
+                succeeded: false,
+                denied: false,
+            };
         }
     };
     let original = match std::fs::read_to_string(&full_path) {
         Ok(original) => original,
         Err(e) => {
             results.push(format!("✗ {path}: cannot read — {e}"));
-            return false;
+            return StageOutcome {
+                succeeded: false,
+                denied: false,
+            };
         }
     };
 
@@ -92,22 +120,28 @@ fn stage_change(
         } => {
             new_contents.push((full_path, content));
             results.push(format!("✓ {path} (tier {tier})"));
-            true
+            StageOutcome {
+                succeeded: true,
+                denied: false,
+            }
         }
         dsx_patch::ApplyResult::Failed { path, reason } => {
             results.push(format!("✗ {path}: {reason}"));
-            false
+            StageOutcome {
+                succeeded: false,
+                denied: false,
+            }
         }
     }
 }
 
-fn result(id: &str, content: String, success: bool, risk: RiskLevel) -> ToolResult {
+fn result(id: &str, content: String, success: bool, risk: RiskLevel, denied: bool) -> ToolResult {
     ToolResult {
         tool_call_id: id.into(),
         name: "propose_patch".into(),
         content,
         success,
         risk,
-        denied: false,
+        denied,
     }
 }

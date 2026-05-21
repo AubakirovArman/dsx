@@ -23,3 +23,9 @@ pub(crate) fn truncate_content(content: &str, max_chars: usize) -> String {
         truncated
     }
 }
+
+pub(crate) fn is_scope_error_text(text: &str) -> bool {
+    text.contains("path traversal blocked")
+        || text.contains("leaves active scope")
+        || text.contains("outside launch workspace")
+}

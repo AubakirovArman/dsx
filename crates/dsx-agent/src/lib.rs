@@ -12,6 +12,8 @@ pub mod tool_defs;
 pub mod tool_executor;
 pub mod tool_executor_tests;
 pub mod tool_implementations;
+#[cfg(test)]
+pub mod tool_scope_tests;
 pub mod transcript;
 pub mod types;
 
