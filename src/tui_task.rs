@@ -17,6 +17,9 @@ pub async fn start_agent_task(
         return Ok(());
     };
     crate::session_state::record_task_started(&prepared.active_root, &prepared.task).await?;
+    if !crate::tui_context_budget::preflight_context_budget(app, &prepared.task).await {
+        return Ok(());
+    }
     crate::tui_state::start_active_scope_indexing(app.clone(), prepared.active_root.clone(), rt);
     prepared.ledger_id = start_run_ledger(app, session_id, &prepared).await;
     persist_user_message(session_id, pool, rt, &prepared.task);

@@ -23,6 +23,9 @@ mod session_state_tests;
 pub mod task_scope;
 #[cfg(test)]
 mod task_scope_tests;
+pub mod tui_context_budget;
+#[cfg(test)]
+mod tui_context_budget_tests;
 pub mod tui_keys;
 #[cfg(test)]
 mod tui_keys_tests;
