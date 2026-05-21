@@ -6,6 +6,34 @@ pub(crate) async fn add_missing_columns(pool: &SqlitePool) -> anyhow::Result<()>
     add_column(
         pool,
         "agent_runs",
+        "launch_scope",
+        "launch_scope TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    add_column(
+        pool,
+        "agent_runs",
+        "active_scope",
+        "active_scope TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    add_column(
+        pool,
+        "agent_runs",
+        "scope_status",
+        "scope_status TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    add_column(
+        pool,
+        "agent_runs",
+        "scope_reason",
+        "scope_reason TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    add_column(
+        pool,
+        "agent_runs",
         "scope_violations",
         "scope_violations INTEGER NOT NULL DEFAULT 0",
     )
@@ -111,6 +139,10 @@ mod tests {
 
         assert!(has_column(&pool, "agent_runs", "scope_violations").await);
         assert!(has_column(&pool, "agent_runs", "last_scope_violation").await);
+        assert!(has_column(&pool, "agent_runs", "launch_scope").await);
+        assert!(has_column(&pool, "agent_runs", "active_scope").await);
+        assert!(has_column(&pool, "agent_runs", "scope_status").await);
+        assert!(has_column(&pool, "agent_runs", "scope_reason").await);
         assert!(has_column(&pool, "task_summaries", "scope_violations").await);
         assert!(has_column(&pool, "task_summaries", "last_scope_violation").await);
 

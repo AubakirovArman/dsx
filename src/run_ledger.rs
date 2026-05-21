@@ -18,6 +18,25 @@ pub struct RunLedgerSnapshot {
     pub cancelled: bool,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunScopeContract {
+    pub launch_scope: String,
+    pub active_scope: String,
+    pub scope_status: String,
+    pub scope_reason: String,
+}
+
+impl RunScopeContract {
+    pub fn from_app(app: &dsx_tui::App) -> Self {
+        Self {
+            launch_scope: app.scope_lock.launch_scope.clone(),
+            active_scope: app.scope_lock.active_scope.clone(),
+            scope_status: app.scope_lock.status.clone(),
+            scope_reason: app.scope_lock.reason.clone(),
+        }
+    }
+}
+
 impl RunLedgerSnapshot {
     pub fn from_app(app: &dsx_tui::App, status: &str, error: Option<String>) -> Self {
         Self {
@@ -41,10 +60,23 @@ pub async fn record_started(
     active_root: &Path,
     session_id: Option<&str>,
     task: &str,
+    contract: RunScopeContract,
 ) -> anyhow::Result<String> {
     let pool = open_pool(active_root).await?;
     let project_root = active_root.display().to_string();
-    dsx_memory::start_agent_run(&pool, session_id, &project_root, task).await
+    dsx_memory::start_scoped_agent_run(
+        &pool,
+        &dsx_memory::AgentRunStart {
+            session_id,
+            project_root: &project_root,
+            task,
+            launch_scope: &contract.launch_scope,
+            active_scope: &contract.active_scope,
+            scope_status: &contract.scope_status,
+            scope_reason: &contract.scope_reason,
+        },
+    )
+    .await
 }
 
 pub async fn record_finished(
@@ -101,5 +133,47 @@ mod tests {
         assert_eq!(snapshot.compaction_events, 2);
         assert_eq!(snapshot.scope_violations, 1);
         assert!(snapshot.last_scope_violation.contains("read_file"));
+    }
+
+    #[tokio::test]
+    async fn record_started_persists_scope_contract() {
+        let root = temp_root("dsx_run_contract");
+        let active = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&active).unwrap();
+        let mut app = dsx_tui::App::new();
+        app.begin_task_scoped(
+            "build",
+            &root.display().to_string(),
+            &active.display().to_string(),
+            true,
+        );
+        let contract = RunScopeContract::from_app(&app);
+
+        let id = record_started(&active, None, "build", contract)
+            .await
+            .unwrap();
+        let pool = dsx_memory::open(&active.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let run = dsx_memory::load_agent_run(&pool, &id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(run.launch_scope, root.display().to_string());
+        assert_eq!(run.active_scope, active.display().to_string());
+        assert_eq!(run.scope_status, "Narrowed");
+
+        pool.close().await;
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn temp_root(name: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("{name}_{nanos}"))
     }
 }

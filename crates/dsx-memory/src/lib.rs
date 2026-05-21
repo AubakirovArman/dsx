@@ -12,8 +12,8 @@ pub mod run_ledger;
 pub mod task_summary;
 
 pub use run_ledger::{
-    AgentRunRecord, AgentRunUpdate, finish_agent_run, load_agent_run, recent_agent_runs,
-    recent_agent_runs_any, start_agent_run,
+    AgentRunRecord, AgentRunStart, AgentRunUpdate, finish_agent_run, load_agent_run,
+    recent_agent_runs, recent_agent_runs_any, start_agent_run, start_scoped_agent_run,
 };
 pub use task_summary::{TaskSummary, load_task_summary, upsert_task_summary};
 
@@ -97,6 +97,10 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
             compaction_events INTEGER NOT NULL DEFAULT 0,
             compacted_messages INTEGER NOT NULL DEFAULT 0,
             estimated_tokens_saved INTEGER NOT NULL DEFAULT 0,
+            launch_scope TEXT NOT NULL DEFAULT '',
+            active_scope TEXT NOT NULL DEFAULT '',
+            scope_status TEXT NOT NULL DEFAULT '',
+            scope_reason TEXT NOT NULL DEFAULT '',
             scope_violations INTEGER NOT NULL DEFAULT 0,
             last_scope_violation TEXT NOT NULL DEFAULT '',
             error TEXT,

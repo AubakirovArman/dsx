@@ -36,10 +36,24 @@ pub struct AgentRunRecord {
     pub compaction_events: i64,
     pub compacted_messages: i64,
     pub estimated_tokens_saved: i64,
+    pub launch_scope: String,
+    pub active_scope: String,
+    pub scope_status: String,
+    pub scope_reason: String,
     pub scope_violations: i64,
     pub last_scope_violation: String,
     pub error: Option<String>,
     pub cancelled: bool,
+}
+
+pub struct AgentRunStart<'a> {
+    pub session_id: Option<&'a str>,
+    pub project_root: &'a str,
+    pub task: &'a str,
+    pub launch_scope: &'a str,
+    pub active_scope: &'a str,
+    pub scope_status: &'a str,
+    pub scope_reason: &'a str,
 }
 
 pub async fn start_agent_run(
@@ -48,21 +62,45 @@ pub async fn start_agent_run(
     project_root: &str,
     task: &str,
 ) -> anyhow::Result<String> {
+    start_scoped_agent_run(
+        pool,
+        &AgentRunStart {
+            session_id,
+            project_root,
+            task,
+            launch_scope: project_root,
+            active_scope: project_root,
+            scope_status: "legacy",
+            scope_reason: "Legacy start without explicit scope contract.",
+        },
+    )
+    .await
+}
+
+pub async fn start_scoped_agent_run(
+    pool: &SqlitePool,
+    start: &AgentRunStart<'_>,
+) -> anyhow::Result<String> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     sqlx::query(
         r#"
         INSERT INTO agent_runs (
-            id, session_id, project_root, task_excerpt, status, started_at
+            id, session_id, project_root, task_excerpt, status, started_at,
+            launch_scope, active_scope, scope_status, scope_reason
         )
-        VALUES (?, ?, ?, ?, 'running', ?)
+        VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)
         "#,
     )
     .bind(&id)
-    .bind(session_id)
-    .bind(project_root)
-    .bind(excerpt(task, 1_200))
+    .bind(start.session_id)
+    .bind(start.project_root)
+    .bind(excerpt(start.task, 1_200))
     .bind(now)
+    .bind(start.launch_scope)
+    .bind(start.active_scope)
+    .bind(start.scope_status)
+    .bind(start.scope_reason)
     .execute(pool)
     .await?;
     Ok(id)
@@ -121,7 +159,8 @@ pub async fn load_agent_run(pool: &SqlitePool, id: &str) -> anyhow::Result<Optio
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, scope_violations,
+               compacted_messages, estimated_tokens_saved, launch_scope,
+               active_scope, scope_status, scope_reason, scope_violations,
                last_scope_violation, error, cancelled
         FROM agent_runs
         WHERE id = ?
@@ -143,7 +182,8 @@ pub async fn recent_agent_runs(
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, scope_violations,
+               compacted_messages, estimated_tokens_saved, launch_scope,
+               active_scope, scope_status, scope_reason, scope_violations,
                last_scope_violation, error, cancelled
         FROM agent_runs
         WHERE project_root = ?
@@ -167,7 +207,8 @@ pub async fn recent_agent_runs_any(
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, scope_violations,
+               compacted_messages, estimated_tokens_saved, launch_scope,
+               active_scope, scope_status, scope_reason, scope_violations,
                last_scope_violation, error, cancelled
         FROM agent_runs
         ORDER BY started_at DESC
@@ -210,6 +251,10 @@ struct AgentRunRow {
     compaction_events: i64,
     compacted_messages: i64,
     estimated_tokens_saved: i64,
+    launch_scope: String,
+    active_scope: String,
+    scope_status: String,
+    scope_reason: String,
     scope_violations: i64,
     last_scope_violation: String,
     error: Option<String>,
@@ -234,6 +279,10 @@ impl From<AgentRunRow> for AgentRunRecord {
             compaction_events: row.compaction_events,
             compacted_messages: row.compacted_messages,
             estimated_tokens_saved: row.estimated_tokens_saved,
+            launch_scope: row.launch_scope,
+            active_scope: row.active_scope,
+            scope_status: row.scope_status,
+            scope_reason: row.scope_reason,
             scope_violations: row.scope_violations,
             last_scope_violation: row.last_scope_violation,
             error: row.error,

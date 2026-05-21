@@ -21,7 +21,7 @@ pub async fn start_agent_task(
         return Ok(());
     }
     crate::tui_state::start_active_scope_indexing(app.clone(), prepared.active_root.clone(), rt);
-    prepared.ledger_id = start_run_ledger(app, session_id, &prepared).await;
+    prepared.ledger_id = crate::tui_run_ledger::start_run_ledger(app, session_id, &prepared).await;
     persist_user_message(session_id, pool, rt, &prepared.task);
 
     let api_base = app.lock().unwrap().api_base.clone();
@@ -148,27 +148,6 @@ pub(crate) fn prepare_task(
         active_root: scope.active_root,
         mode,
     })
-}
-
-async fn start_run_ledger(
-    app: &SharedApp,
-    session_id: &Option<String>,
-    task: &PreparedTask,
-) -> Option<String> {
-    match crate::run_ledger::record_started(&task.active_root, session_id.as_deref(), &task.task)
-        .await
-    {
-        Ok(id) => {
-            app.lock().unwrap().active_ledger_id = Some(id.clone());
-            Some(id)
-        }
-        Err(e) => {
-            app.lock()
-                .unwrap()
-                .add_message("error", &format!("Run ledger start failed: {e}"));
-            None
-        }
-    }
 }
 
 fn spawn_agent(

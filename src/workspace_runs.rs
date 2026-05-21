@@ -127,6 +127,18 @@ fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
     if all {
         println!("      scope: {}", scope_label(project_root, located));
     }
+    if !run.active_scope.trim().is_empty() {
+        println!(
+            "      contract: {} -> {} ({})",
+            scope_text(&run.launch_scope),
+            scope_text(&run.active_scope),
+            run.scope_status
+        );
+        println!(
+            "      reason: {}",
+            crate::handlers::task_preview(&run.scope_reason)
+        );
+    }
     println!("      {}", crate::handlers::task_preview(&run.task_excerpt));
     if let Some(error) = &run.error {
         println!("      error: {}", crate::handlers::task_preview(error));
@@ -137,6 +149,10 @@ fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
             crate::handlers::task_preview(&run.last_scope_violation)
         );
     }
+}
+
+fn scope_text(value: &str) -> &str {
+    if value.trim().is_empty() { "." } else { value }
 }
 
 fn scope_label(project_root: &Path, located: &LocatedRun) -> String {
