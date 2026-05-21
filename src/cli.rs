@@ -68,6 +68,9 @@ pub enum Command {
         /// Exit with an error when the estimated request exceeds the budget
         #[arg(long)]
         check: bool,
+        /// Exit with an error if the task did not narrow to a child scope
+        #[arg(long)]
+        require_narrow: bool,
     },
     /// Build or query the local code index
     Index {

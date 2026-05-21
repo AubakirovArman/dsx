@@ -95,9 +95,14 @@ async fn main() -> anyhow::Result<()> {
             let desc = task.join(" ");
             run_scope_preview(&project_root, &desc);
         }
-        Some(Command::Context { task, json, check }) => {
+        Some(Command::Context {
+            task,
+            json,
+            check,
+            require_narrow,
+        }) => {
             let desc = task.join(" ");
-            run_context_preview(&project_root, &desc, json, check).await?;
+            run_context_preview(&project_root, &desc, json, check, require_narrow).await?;
         }
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,

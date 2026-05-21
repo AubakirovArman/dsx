@@ -2,7 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::context_preview::{build_context_preview, enforce_request_budget, preview_json};
+    use crate::context_preview::{
+        build_context_preview, enforce_narrow_scope, enforce_request_budget, preview_json,
+    };
 
     #[tokio::test]
     async fn context_preview_uses_narrowed_existing_scope() {
@@ -103,6 +105,32 @@ mod tests {
         let err = enforce_request_budget(&preview).unwrap_err();
 
         assert!(err.to_string().contains("over request budget"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn context_preview_require_narrow_rejects_wide_scope() {
+        let root = temp_root("dsx_context_preview_require_narrow");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+
+        let preview = build_context_preview(&root, "build").await.unwrap();
+        let err = enforce_narrow_scope(&preview).unwrap_err();
+
+        assert!(err.to_string().contains("launch workspace"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn context_preview_require_narrow_allows_child_scope() {
+        let root = temp_root("dsx_context_preview_require_narrow_child");
+        let child = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&child).unwrap();
+
+        let preview = build_context_preview(&root, "build 1234").await.unwrap();
+
+        enforce_narrow_scope(&preview).unwrap();
         let _ = std::fs::remove_dir_all(root);
     }
 

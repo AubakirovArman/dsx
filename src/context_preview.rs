@@ -31,12 +31,16 @@ pub async fn run_context_preview(
     task: &str,
     json: bool,
     check: bool,
+    require_narrow: bool,
 ) -> anyhow::Result<()> {
     let preview = build_context_preview(project_root, task).await?;
     if json {
         println!("{}", preview_json(&preview));
     } else {
         print_preview(&preview);
+    }
+    if require_narrow {
+        enforce_narrow_scope(&preview)?;
     }
     if check {
         enforce_request_budget(&preview)?;
@@ -166,6 +170,15 @@ pub(crate) fn enforce_request_budget(preview: &ContextPreview) -> anyhow::Result
     if estimated > limit {
         anyhow::bail!(
             "Context preview over request budget: estimated {estimated} tokens, limit {limit}. Narrow the task scope or reduce context before calling the model."
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn enforce_narrow_scope(preview: &ContextPreview) -> anyhow::Result<()> {
+    if !preview.narrowed {
+        anyhow::bail!(
+            "Context preview stayed on the launch workspace. Add an explicit child folder like ./1234 or remove --require-narrow for an intentional workspace-wide task."
         );
     }
     Ok(())
