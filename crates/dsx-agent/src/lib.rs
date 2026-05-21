@@ -29,8 +29,18 @@ pub async fn run_streaming(
     tx: mpsc::UnboundedSender<StreamEvent>,
 ) -> anyhow::Result<AgentOutcome> {
     let result = run_streaming_internal(task, config, tx.clone()).await;
-    if let Err(ref e) = result {
-        let _ = tx.send(StreamEvent::Error(e.to_string()));
+    match result {
+        Ok(ref outcome) => {
+            let _ = tx.send(StreamEvent::Done {
+                answer: outcome.answer.clone().unwrap_or_default(),
+                iterations: outcome.iterations,
+                tokens: outcome.total_prompt_tokens + outcome.total_completion_tokens,
+                cost: outcome.estimated_cost_usd,
+            });
+        }
+        Err(ref e) => {
+            let _ = tx.send(StreamEvent::Error(e.to_string()));
+        }
     }
     result
 }
@@ -117,6 +127,7 @@ async fn run_streaming_internal(
                 StreamEvent::Error(err) => {
                     anyhow::bail!("Agent error: {err}");
                 }
+                StreamEvent::Done { .. } => {}
             }
         }
 

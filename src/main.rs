@@ -620,6 +620,14 @@ fn convert_event(ev: &dsx_provider::streaming::StreamEvent) -> dsx_tui::AgentStr
             // Finish is handled by Done event separately
             dsx_tui::AgentStreamEvent::Reasoning(String::new())
         }
+        dsx_provider::streaming::StreamEvent::Done { answer, iterations, tokens, cost } => {
+            dsx_tui::AgentStreamEvent::Done {
+                answer: answer.clone(),
+                iterations: *iterations,
+                tokens: *tokens,
+                cost: *cost,
+            }
+        }
         dsx_provider::streaming::StreamEvent::Error(err) => {
             dsx_tui::AgentStreamEvent::Error(err.clone())
         }

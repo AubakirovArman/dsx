@@ -87,6 +87,13 @@ pub enum StreamEvent {
     },
     /// An execution or API connection error.
     Error(String),
+    /// Global Agent completion event with final totals.
+    Done {
+        answer: String,
+        iterations: usize,
+        tokens: u64,
+        cost: f64,
+    },
 }
 
 /// A complete tool call ready for execution.

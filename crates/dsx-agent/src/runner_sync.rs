@@ -127,6 +127,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
                 StreamEvent::Error(err) => {
                     anyhow::bail!("Agent error: {err}");
                 }
+                StreamEvent::Done { .. } => {}
             }
         }
 
