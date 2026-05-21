@@ -14,6 +14,11 @@ pub async fn open(path: &Path) -> anyhow::Result<SqlitePool> {
     }
     let url = format!("sqlite://{}?mode=rwc", path.display());
     let pool = SqlitePool::connect(&url).await?;
+    
+    // Configure SQLite performance and high concurrency optimizations
+    let _ = sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await;
+    let _ = sqlx::query("PRAGMA busy_timeout=10000;").execute(&pool).await;
+    
     run_migrations(&pool).await?;
     Ok(pool)
 }

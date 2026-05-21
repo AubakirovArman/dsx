@@ -236,10 +236,13 @@ pub async fn build_symbol_index(root: &Path, pool: &sqlx::SqlitePool) -> anyhow:
     let files = scan_project(root)?;
     let mut count = 0;
     
+    // Start explicit write transaction
+    let mut tx = pool.begin().await?;
+    
     // Clear old symbols
     sqlx::query("DELETE FROM symbols WHERE project_root = ?")
         .bind(root.display().to_string())
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
         
     for file_path_str in files {
@@ -263,7 +266,7 @@ pub async fn build_symbol_index(root: &Path, pool: &sqlx::SqlitePool) -> anyhow:
                         .bind(s.start_line as i32)
                         .bind(s.end_line as i32)
                         .bind(&s.signature)
-                        .execute(pool)
+                        .execute(&mut *tx)
                         .await?;
                         count += 1;
                     }
@@ -271,6 +274,9 @@ pub async fn build_symbol_index(root: &Path, pool: &sqlx::SqlitePool) -> anyhow:
             }
         }
     }
+    
+    // Commit transaction
+    tx.commit().await?;
     
     Ok(count)
 }
