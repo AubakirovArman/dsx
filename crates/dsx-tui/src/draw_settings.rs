@@ -323,6 +323,7 @@ impl App {
                         .title(Span::styled(tr(self.lang, "input_auth_title"), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)))
                 )
                 .style(Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD))
+                .wrap(Wrap { trim: false })
         } else {
             let (prompt, block_title, style) = match &self.agent_task {
                 AgentTask::Idle => (
@@ -364,6 +365,7 @@ impl App {
                         .title(Span::styled(block_title, style.add_modifier(Modifier::BOLD)))
                 )
                 .style(Style::default().fg(Color::White))
+                .wrap(Wrap { trim: false })
         };
 
         frame.render_widget(input_widget, area);
