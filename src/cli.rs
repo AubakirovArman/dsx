@@ -95,6 +95,15 @@ pub enum WorkspaceAction {
         #[arg(long)]
         all: bool,
     },
+    /// Show compact task notes saved for workspace scopes
+    Notes {
+        /// Maximum scopes to show
+        #[arg(short, long, default_value_t = 20)]
+        limit: u32,
+        /// Include direct child folders under the launch workspace
+        #[arg(long)]
+        all: bool,
+    },
     /// Mark unfinished running run rows as stale across scopes
     CloseStaleRuns {
         /// Only close runs older than this many minutes

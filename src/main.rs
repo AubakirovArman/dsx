@@ -22,6 +22,9 @@ mod tui_state_tests;
 pub mod tui_task;
 #[cfg(test)]
 mod tui_task_tests;
+pub mod workspace_notes;
+#[cfg(test)]
+mod workspace_notes_tests;
 pub mod workspace_runs;
 pub mod workspace_stale_runs;
 
@@ -31,6 +34,7 @@ use handlers::{
     list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
     run_mcp_list, run_plan, run_scope_preview, task_preview,
 };
+use workspace_notes::list_workspace_notes;
 use workspace_runs::list_agent_runs;
 use workspace_stale_runs::close_stale_runs;
 
@@ -185,6 +189,9 @@ async fn run_workspace_action(
         None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
         Some(WorkspaceAction::Runs { limit, all }) => {
             list_agent_runs(&project_root, limit, all).await
+        }
+        Some(WorkspaceAction::Notes { limit, all }) => {
+            list_workspace_notes(&project_root, limit, all).await
         }
         Some(WorkspaceAction::CloseStaleRuns {
             older_than_minutes,
