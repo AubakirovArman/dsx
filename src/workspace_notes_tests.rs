@@ -59,6 +59,23 @@ mod tests {
         assert_eq!(first["goal"], "json goal");
         assert_eq!(first["plan"], "json plan");
         assert!(first.get("architecture").is_some());
+        assert_eq!(first["scope_violations"], 0);
+        assert_eq!(first["last_scope_violation"], "");
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn notes_surface_saved_scope_violations() {
+        let root = temp_root("dsx_workspace_notes_scope_guard");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        seed_scope_violation_summary(&root).await;
+
+        let notes = collect_workspace_notes(&root, 1, false).await.unwrap();
+
+        assert_eq!(notes[0].scope_violations, 2);
+        assert!(notes[0].last_scope_violation.contains("read_file"));
 
         let _ = std::fs::remove_dir_all(root);
     }
@@ -73,6 +90,18 @@ mod tests {
         summary.plan = plan.into();
         summary.last_changes = "last".into();
         summary.next_step = "next".into();
+        dsx_memory::upsert_task_summary(&pool, &summary)
+            .await
+            .unwrap();
+    }
+
+    async fn seed_scope_violation_summary(root: &std::path::Path) {
+        let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let mut summary = dsx_memory::TaskSummary::new(&root.display().to_string());
+        summary.scope_violations = 2;
+        summary.last_scope_violation = "read_file: denied by active scope".into();
         dsx_memory::upsert_task_summary(&pool, &summary)
             .await
             .unwrap();

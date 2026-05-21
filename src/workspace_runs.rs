@@ -114,13 +114,14 @@ fn print_runs(project_root: &Path, runs: &[LocatedRun], all: bool) {
 fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
     let run = &located.run;
     println!(
-        "  {}  {}  {} tok  ${:.4}  compact:{}/~{}tok  {}",
+        "  {}  {}  {} tok  ${:.4}  compact:{}/~{}tok  scope:{}  {}",
         &run.id[..8.min(run.id.len())],
         run.status,
         run.total_tokens,
         run.estimated_cost_usd,
         run.compaction_events,
         run.estimated_tokens_saved,
+        run.scope_violations,
         run.started_at.chars().take(19).collect::<String>(),
     );
     if all {
@@ -129,6 +130,12 @@ fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
     println!("      {}", crate::handlers::task_preview(&run.task_excerpt));
     if let Some(error) = &run.error {
         println!("      error: {}", crate::handlers::task_preview(error));
+    }
+    if run.scope_violations > 0 {
+        println!(
+            "      scope_guard: {}",
+            crate::handlers::task_preview(&run.last_scope_violation)
+        );
     }
 }
 
@@ -220,6 +227,8 @@ mod tests {
             &dsx_memory::AgentRunUpdate {
                 status: "completed".into(),
                 prompt_tokens: 1,
+                scope_violations: 1,
+                last_scope_violation: "read_file: denied by active scope".into(),
                 ..Default::default()
             },
         )

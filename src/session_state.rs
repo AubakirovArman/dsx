@@ -28,6 +28,8 @@ pub async fn record_task_started(active_root: &Path, task: &str) -> anyhow::Resu
     summary.active_scope = project_root;
     summary.constraints = default_constraints();
     summary.architecture = architecture_outline(active_root);
+    summary.scope_violations = 0;
+    summary.last_scope_violation.clear();
     summary.updated_at.clear();
 
     dsx_memory::upsert_task_summary(&pool, &summary).await
@@ -37,6 +39,8 @@ pub async fn record_task_finished(
     active_root: &Path,
     brief: &dsx_tui::TaskBriefPanel,
     tools: &[dsx_tui::ToolTimelineEntry],
+    scope_violations: u64,
+    last_scope_violation: &str,
 ) -> anyhow::Result<()> {
     let db_path = active_root.join(".dsx").join("sessions.db");
     let pool = dsx_memory::open(&db_path).await?;
@@ -53,6 +57,8 @@ pub async fn record_task_finished(
     summary.active_scope = brief.active_scope.clone();
     summary.constraints = default_constraints();
     summary.architecture = architecture_outline(active_root);
+    summary.scope_violations = scope_violations;
+    summary.last_scope_violation = last_scope_violation.to_string();
     summary.updated_at.clear();
 
     dsx_memory::upsert_task_summary(&pool, &summary).await
@@ -97,11 +103,7 @@ async fn load_child_summary(path: &Path) -> Option<dsx_memory::TaskSummary> {
 fn folder_note(name: &str, summary: Option<&dsx_memory::TaskSummary>) -> dsx_tui::FolderNote {
     dsx_tui::FolderNote {
         folder: format!("{name}/"),
-        summary: truncate_note(
-            summary
-                .and_then(summary_text)
-                .unwrap_or_else(|| describe_dir(name)),
-        ),
+        summary: truncate_note(summary_text(summary).unwrap_or_else(|| describe_dir(name).into())),
         next_step: truncate_note(
             summary
                 .and_then(|summary| non_empty(&summary.next_step))
@@ -110,10 +112,18 @@ fn folder_note(name: &str, summary: Option<&dsx_memory::TaskSummary>) -> dsx_tui
     }
 }
 
-fn summary_text(summary: &dsx_memory::TaskSummary) -> Option<&str> {
+fn summary_text(summary: Option<&dsx_memory::TaskSummary>) -> Option<String> {
+    let summary = summary?;
+    if summary.scope_violations > 0 {
+        return Some(format!(
+            "Scope guard blocked {} escape(s): {}",
+            summary.scope_violations, summary.last_scope_violation
+        ));
+    }
     non_empty(&summary.last_changes)
         .or_else(|| non_empty(&summary.done))
         .or_else(|| non_empty(&summary.goal))
+        .map(ToOwned::to_owned)
 }
 
 fn non_empty(value: &str) -> Option<&str> {

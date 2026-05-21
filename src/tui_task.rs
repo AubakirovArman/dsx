@@ -71,7 +71,6 @@ pub fn stop_agent_task(app: &SharedApp, rt: &Handle) -> bool {
         app.add_message("system", "No active agent run to stop.");
         return false;
     };
-
     abort.abort();
     let ledger_id = app.active_ledger_id.take();
     let active_scope = app.task_brief.active_scope.clone();
@@ -218,7 +217,7 @@ pub(crate) fn finish_task(
     run_id: u64,
     rt: Handle,
 ) {
-    let (assistant, brief, tools, cost, tokens, ledger_id, snapshot) = {
+    let (assistant, brief, tools, violations, last_violation, cost, tokens, ledger_id, snapshot) = {
         let mut app = app.lock().unwrap();
         if app.active_run_id != Some(run_id) {
             return;
@@ -231,18 +230,20 @@ pub(crate) fn finish_task(
             app.agent_task = dsx_tui::AgentTask::Done("ready".into());
         }
         let snapshot = crate::run_ledger::RunLedgerSnapshot::from_app(&app, status, error);
-        let assistant = completed
-            .then(|| {
-                app.messages
-                    .last()
-                    .filter(|m| m.role == "assistant")
-                    .cloned()
-            })
-            .flatten();
+        let assistant = if completed {
+            app.messages
+                .last()
+                .filter(|m| m.role == "assistant")
+                .cloned()
+        } else {
+            None
+        };
         (
             assistant,
             app.task_brief.clone(),
             app.tool_timeline.clone(),
+            app.scope_violations,
+            app.last_scope_violation.clone(),
             app.cost,
             app.tokens,
             app.active_ledger_id.take(),
@@ -252,7 +253,14 @@ pub(crate) fn finish_task(
 
     let summary_root = active_root.clone();
     rt.spawn(async move {
-        let _ = crate::session_state::record_task_finished(&summary_root, &brief, &tools).await;
+        let _ = crate::session_state::record_task_finished(
+            &summary_root,
+            &brief,
+            &tools,
+            violations,
+            &last_violation,
+        )
+        .await;
     });
     persist_run_ledger(&rt, ledger_id, active_root.clone(), snapshot);
     if let (Some(msg), Some(sid), Some(pool)) = (assistant, session_id, pool) {

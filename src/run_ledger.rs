@@ -12,6 +12,8 @@ pub struct RunLedgerSnapshot {
     pub compaction_events: u64,
     pub compacted_messages: u64,
     pub estimated_tokens_saved: u64,
+    pub scope_violations: u64,
+    pub last_scope_violation: String,
     pub error: Option<String>,
     pub cancelled: bool,
 }
@@ -27,6 +29,8 @@ impl RunLedgerSnapshot {
             compaction_events: app.compaction_events,
             compacted_messages: app.compacted_messages,
             estimated_tokens_saved: app.estimated_tokens_saved,
+            scope_violations: app.scope_violations,
+            last_scope_violation: app.last_scope_violation.clone(),
             cancelled: status == "cancelled",
             error,
         }
@@ -67,6 +71,8 @@ impl From<RunLedgerSnapshot> for dsx_memory::AgentRunUpdate {
             compaction_events: value.compaction_events,
             compacted_messages: value.compacted_messages,
             estimated_tokens_saved: value.estimated_tokens_saved,
+            scope_violations: value.scope_violations,
+            last_scope_violation: value.last_scope_violation,
             error: value.error,
             cancelled: value.cancelled,
         }
@@ -85,11 +91,15 @@ mod tests {
         app.tokens = 160;
         app.cost = 0.40;
         app.compaction_events = 2;
+        app.scope_violations = 1;
+        app.last_scope_violation = "read_file: denied".into();
 
         let snapshot = RunLedgerSnapshot::from_app(&app, "completed", None);
 
         assert_eq!(snapshot.prompt_tokens, 60);
         assert!((snapshot.estimated_cost_usd - 0.15).abs() < 0.0001);
         assert_eq!(snapshot.compaction_events, 2);
+        assert_eq!(snapshot.scope_violations, 1);
+        assert!(snapshot.last_scope_violation.contains("read_file"));
     }
 }

@@ -13,6 +13,8 @@ pub struct AgentRunUpdate {
     pub compaction_events: u64,
     pub compacted_messages: u64,
     pub estimated_tokens_saved: u64,
+    pub scope_violations: u64,
+    pub last_scope_violation: String,
     pub error: Option<String>,
     pub cancelled: bool,
 }
@@ -34,6 +36,8 @@ pub struct AgentRunRecord {
     pub compaction_events: i64,
     pub compacted_messages: i64,
     pub estimated_tokens_saved: i64,
+    pub scope_violations: i64,
+    pub last_scope_violation: String,
     pub error: Option<String>,
     pub cancelled: bool,
 }
@@ -84,6 +88,8 @@ pub async fn finish_agent_run(
             compaction_events = ?,
             compacted_messages = ?,
             estimated_tokens_saved = ?,
+            scope_violations = ?,
+            last_scope_violation = ?,
             error = ?,
             cancelled = ?
         WHERE id = ?
@@ -99,6 +105,8 @@ pub async fn finish_agent_run(
     .bind(to_i64(update.compaction_events))
     .bind(to_i64(update.compacted_messages))
     .bind(to_i64(update.estimated_tokens_saved))
+    .bind(to_i64(update.scope_violations))
+    .bind(&update.last_scope_violation)
     .bind(&update.error)
     .bind(i64::from(update.cancelled))
     .bind(id)
@@ -113,7 +121,8 @@ pub async fn load_agent_run(pool: &SqlitePool, id: &str) -> anyhow::Result<Optio
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, error, cancelled
+               compacted_messages, estimated_tokens_saved, scope_violations,
+               last_scope_violation, error, cancelled
         FROM agent_runs
         WHERE id = ?
         "#,
@@ -134,7 +143,8 @@ pub async fn recent_agent_runs(
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, error, cancelled
+               compacted_messages, estimated_tokens_saved, scope_violations,
+               last_scope_violation, error, cancelled
         FROM agent_runs
         WHERE project_root = ?
         ORDER BY started_at DESC
@@ -157,7 +167,8 @@ pub async fn recent_agent_runs_any(
         SELECT id, session_id, project_root, task_excerpt, status, started_at,
                finished_at, prompt_tokens, completion_tokens, reasoning_tokens,
                total_tokens, estimated_cost_usd, compaction_events,
-               compacted_messages, estimated_tokens_saved, error, cancelled
+               compacted_messages, estimated_tokens_saved, scope_violations,
+               last_scope_violation, error, cancelled
         FROM agent_runs
         ORDER BY started_at DESC
         LIMIT ?
@@ -199,6 +210,8 @@ struct AgentRunRow {
     compaction_events: i64,
     compacted_messages: i64,
     estimated_tokens_saved: i64,
+    scope_violations: i64,
+    last_scope_violation: String,
     error: Option<String>,
     cancelled: i64,
 }
@@ -221,6 +234,8 @@ impl From<AgentRunRow> for AgentRunRecord {
             compaction_events: row.compaction_events,
             compacted_messages: row.compacted_messages,
             estimated_tokens_saved: row.estimated_tokens_saved,
+            scope_violations: row.scope_violations,
+            last_scope_violation: row.last_scope_violation,
             error: row.error,
             cancelled: row.cancelled != 0,
         }
@@ -228,55 +243,5 @@ impl From<AgentRunRow> for AgentRunRecord {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn stores_and_finishes_agent_run() {
-        let db_path =
-            std::env::temp_dir().join(format!("dsx_agent_run_{}.db", uuid::Uuid::new_v4()));
-        let pool = crate::open(&db_path).await.unwrap();
-
-        let id = start_agent_run(&pool, Some("sid"), "/tmp/project", "do useful work")
-            .await
-            .unwrap();
-        finish_agent_run(
-            &pool,
-            &id,
-            &AgentRunUpdate {
-                status: "completed".into(),
-                prompt_tokens: 10,
-                completion_tokens: 5,
-                reasoning_tokens: 2,
-                estimated_cost_usd: 0.01,
-                compaction_events: 1,
-                compacted_messages: 8,
-                estimated_tokens_saved: 120,
-                error: None,
-                cancelled: false,
-            },
-        )
-        .await
-        .unwrap();
-
-        let run = load_agent_run(&pool, &id).await.unwrap().unwrap();
-
-        assert_eq!(run.session_id.as_deref(), Some("sid"));
-        assert_eq!(run.status, "completed");
-        assert_eq!(run.total_tokens, 17);
-        assert_eq!(run.compaction_events, 1);
-        assert_eq!(run.estimated_tokens_saved, 120);
-        assert!(run.finished_at.is_some());
-        assert_eq!(
-            recent_agent_runs(&pool, "/tmp/project", 10)
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
-        assert_eq!(recent_agent_runs_any(&pool, 10).await.unwrap().len(), 1);
-
-        let _ = pool.close().await;
-        let _ = std::fs::remove_file(db_path);
-    }
-}
+#[path = "run_ledger_tests.rs"]
+mod tests;

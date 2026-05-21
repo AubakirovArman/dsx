@@ -11,6 +11,8 @@ pub(crate) struct WorkspaceNote {
     pub(crate) last_changes: String,
     pub(crate) next_step: String,
     pub(crate) architecture: String,
+    pub(crate) scope_violations: u64,
+    pub(crate) last_scope_violation: String,
 }
 
 pub async fn list_workspace_notes(project_root: &Path, limit: u32, all: bool, json: bool) {
@@ -98,6 +100,8 @@ fn note_from_scope(
             |s| &s.architecture,
             fallback_arch(project_root, scope),
         ),
+        scope_violations: summary.map(|s| s.scope_violations).unwrap_or(0),
+        last_scope_violation: field(summary, |s| &s.last_scope_violation, ""),
     }
 }
 
@@ -131,6 +135,15 @@ fn print_notes(notes: &[WorkspaceNote], all: bool) {
         print_field("last", &note.last_changes);
         print_field("next", &note.next_step);
         print_field("arch", &note.architecture);
+        if note.scope_violations > 0 {
+            print_field(
+                "scope_guard",
+                &format!(
+                    "{} blocked escape(s); last: {}",
+                    note.scope_violations, note.last_scope_violation
+                ),
+            );
+        }
     }
 }
 
@@ -152,6 +165,8 @@ fn note_json_value(note: &WorkspaceNote) -> serde_json::Value {
         "last_changes": note.last_changes,
         "next_step": note.next_step,
         "architecture": note.architecture,
+        "scope_violations": note.scope_violations,
+        "last_scope_violation": note.last_scope_violation,
     })
 }
 

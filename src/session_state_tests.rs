@@ -35,6 +35,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    #[tokio::test]
+    async fn folder_notes_surface_scope_guard_summary() {
+        let root = temp_root("dsx_folder_notes_scope_guard");
+        let scoped = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&scoped).unwrap();
+
+        let pool = dsx_memory::open(&scoped.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let mut summary = dsx_memory::TaskSummary::new(&scoped.display().to_string());
+        summary.scope_violations = 2;
+        summary.last_scope_violation = "grep: denied by active scope".into();
+        dsx_memory::upsert_task_summary(&pool, &summary)
+            .await
+            .unwrap();
+
+        let notes = load_folder_notes(&root).await;
+        let scoped_note = notes.iter().find(|note| note.folder == "1234/").unwrap();
+
+        assert!(scoped_note.summary.contains("Scope guard blocked 2"));
+        assert!(scoped_note.summary.contains("grep"));
+
+        pool.close().await;
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     fn temp_root(name: &str) -> std::path::PathBuf {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

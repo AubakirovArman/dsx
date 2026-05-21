@@ -7,6 +7,7 @@
 use sqlx::SqlitePool;
 use std::path::Path;
 
+mod migrations;
 pub mod run_ledger;
 pub mod task_summary;
 
@@ -96,6 +97,8 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
             compaction_events INTEGER NOT NULL DEFAULT 0,
             compacted_messages INTEGER NOT NULL DEFAULT 0,
             estimated_tokens_saved INTEGER NOT NULL DEFAULT 0,
+            scope_violations INTEGER NOT NULL DEFAULT 0,
+            last_scope_violation TEXT NOT NULL DEFAULT '',
             error TEXT,
             cancelled INTEGER NOT NULL DEFAULT 0
         );
@@ -127,6 +130,8 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
             active_scope TEXT NOT NULL DEFAULT '',
             constraints TEXT NOT NULL DEFAULT '',
             architecture TEXT NOT NULL DEFAULT '',
+            scope_violations INTEGER NOT NULL DEFAULT 0,
+            last_scope_violation TEXT NOT NULL DEFAULT '',
             updated_at TEXT NOT NULL
         );
 
@@ -198,6 +203,7 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
     )
     .execute(pool)
     .await?;
+    migrations::add_missing_columns(pool).await?;
     Ok(())
 }
 

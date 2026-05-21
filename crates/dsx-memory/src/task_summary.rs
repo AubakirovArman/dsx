@@ -14,6 +14,8 @@ pub struct TaskSummary {
     pub active_scope: String,
     pub constraints: String,
     pub architecture: String,
+    pub scope_violations: u64,
+    pub last_scope_violation: String,
     pub updated_at: String,
 }
 
@@ -27,6 +29,7 @@ impl TaskSummary {
     }
 
     pub fn compact_text(&self) -> String {
+        let scope_violations = scope_violations_text(self);
         let fields = [
             ("Goal", self.goal.as_str()),
             ("Done", self.done.as_str()),
@@ -36,6 +39,7 @@ impl TaskSummary {
             ("Active scope", self.active_scope.as_str()),
             ("Constraints", self.constraints.as_str()),
             ("Architecture", self.architecture.as_str()),
+            ("Scope violations", scope_violations.as_str()),
         ];
 
         fields
@@ -54,7 +58,8 @@ pub async fn load_task_summary(
     let row = sqlx::query_as::<_, TaskSummaryRow>(
         r#"
         SELECT project_root, goal, done, plan, last_changes, next_step,
-               active_scope, constraints, architecture, updated_at
+               active_scope, constraints, architecture, scope_violations,
+               last_scope_violation, updated_at
         FROM task_summaries
         WHERE project_root = ?
         "#,
@@ -77,9 +82,10 @@ pub async fn upsert_task_summary(pool: &SqlitePool, summary: &TaskSummary) -> an
         r#"
         INSERT INTO task_summaries (
             project_root, goal, done, plan, last_changes, next_step,
-            active_scope, constraints, architecture, updated_at
+            active_scope, constraints, architecture, scope_violations,
+            last_scope_violation, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(project_root) DO UPDATE SET
             goal = excluded.goal,
             done = excluded.done,
@@ -89,6 +95,8 @@ pub async fn upsert_task_summary(pool: &SqlitePool, summary: &TaskSummary) -> an
             active_scope = excluded.active_scope,
             constraints = excluded.constraints,
             architecture = excluded.architecture,
+            scope_violations = excluded.scope_violations,
+            last_scope_violation = excluded.last_scope_violation,
             updated_at = excluded.updated_at
         "#,
     )
@@ -101,6 +109,8 @@ pub async fn upsert_task_summary(pool: &SqlitePool, summary: &TaskSummary) -> an
     .bind(&summary.active_scope)
     .bind(&summary.constraints)
     .bind(&summary.architecture)
+    .bind(summary.scope_violations.min(i64::MAX as u64) as i64)
+    .bind(&summary.last_scope_violation)
     .bind(updated_at)
     .execute(pool)
     .await?;
@@ -119,6 +129,8 @@ struct TaskSummaryRow {
     active_scope: String,
     constraints: String,
     architecture: String,
+    scope_violations: i64,
+    last_scope_violation: String,
     updated_at: String,
 }
 
@@ -134,9 +146,21 @@ impl From<TaskSummaryRow> for TaskSummary {
             active_scope: row.active_scope,
             constraints: row.constraints,
             architecture: row.architecture,
+            scope_violations: row.scope_violations.max(0) as u64,
+            last_scope_violation: row.last_scope_violation,
             updated_at: row.updated_at,
         }
     }
+}
+
+fn scope_violations_text(summary: &TaskSummary) -> String {
+    if summary.scope_violations == 0 {
+        return String::new();
+    }
+    format!(
+        "{} blocked scope escape(s); last: {}",
+        summary.scope_violations, summary.last_scope_violation
+    )
 }
 
 #[cfg(test)]
@@ -152,6 +176,8 @@ mod tests {
         summary.goal = "goal".into();
         summary.done = "done".into();
         summary.next_step = "next".into();
+        summary.scope_violations = 3;
+        summary.last_scope_violation = "grep: denied by active scope".into();
 
         upsert_task_summary(&pool, &summary).await.unwrap();
         let loaded = load_task_summary(&pool, "/tmp/project")
@@ -162,6 +188,8 @@ mod tests {
         assert_eq!(loaded.goal, "goal");
         assert_eq!(loaded.done, "done");
         assert_eq!(loaded.next_step, "next");
+        assert_eq!(loaded.scope_violations, 3);
+        assert!(loaded.compact_text().contains("Scope violations"));
 
         let _ = pool.close().await;
         let _ = std::fs::remove_file(db_path);
