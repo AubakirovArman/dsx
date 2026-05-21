@@ -15,6 +15,14 @@ pub async fn list_agent_runs(project_root: &Path, limit: u32, all: bool) {
     }
 }
 
+pub async fn running_run_count(project_root: &Path) -> anyhow::Result<usize> {
+    let mut count = 0usize;
+    for db_path in discover_run_dbs(project_root)? {
+        count += count_running_rows(&db_path).await?;
+    }
+    Ok(count)
+}
+
 async fn collect_agent_runs(
     project_root: &Path,
     limit: u32,
@@ -42,6 +50,16 @@ async fn collect_agent_runs(
     runs.sort_by(|a, b| b.run.started_at.cmp(&a.run.started_at));
     runs.truncate(limit as usize);
     Ok(runs)
+}
+
+async fn count_running_rows(db_path: &Path) -> anyhow::Result<usize> {
+    let pool = dsx_memory::open(db_path).await?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM agent_runs WHERE status = 'running' AND finished_at IS NULL",
+    )
+    .fetch_one(&pool)
+    .await?;
+    Ok(count.max(0) as usize)
 }
 
 fn discover_run_dbs(project_root: &Path) -> anyhow::Result<Vec<PathBuf>> {
@@ -169,6 +187,23 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    #[tokio::test]
+    async fn running_count_reports_unfinished_runs_across_scopes() {
+        let root = temp_root("dsx_runs_running_count");
+        let child = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&child).unwrap();
+
+        seed_run(&root, "done task").await;
+        seed_running_run(&child, "stuck task").await;
+
+        let count = running_run_count(&root).await.unwrap();
+
+        assert_eq!(count, 1);
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     async fn seed_run(root: &Path, task: &str) {
         let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
             .await
@@ -187,6 +222,15 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    async fn seed_running_run(root: &Path, task: &str) {
+        let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        dsx_memory::start_agent_run(&pool, None, &root.display().to_string(), task)
+            .await
+            .unwrap();
     }
 
     fn temp_root(name: &str) -> PathBuf {

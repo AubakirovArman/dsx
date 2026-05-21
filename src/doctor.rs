@@ -47,6 +47,7 @@ async fn collect_checks(project_root: &Path, api_base: &str, api_key: Option<&st
     checks.push(budget_check());
     checks.push(git_check(project_root));
     checks.push(memory_check(project_root).await);
+    checks.push(run_ledger_check(project_root).await);
     checks.push(line_limit_check(project_root));
     checks
 }
@@ -99,6 +100,17 @@ async fn memory_check(project_root: &Path) -> Check {
             ok("memory", format!("SQLite ready at {}", db_path.display()))
         }
         Err(e) => fail("memory", format!("failed to open SQLite: {e}")),
+    }
+}
+
+async fn run_ledger_check(project_root: &Path) -> Check {
+    match crate::workspace_runs::running_run_count(project_root).await {
+        Ok(0) => ok("run-ledger", "no unfinished agent runs found"),
+        Ok(count) => warn(
+            "run-ledger",
+            format!("{count} unfinished running run(s); use `dsx workspace runs --all` to inspect"),
+        ),
+        Err(e) => warn("run-ledger", format!("failed to inspect run ledger: {e}")),
     }
 }
 
