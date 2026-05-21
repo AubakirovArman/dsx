@@ -2,7 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_state::{configure_initial_app, index_active_scope};
+    use crate::tui_state::{configure_initial_app, index_active_scope, load_startup_audit};
+    use std::path::Path;
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -59,6 +60,69 @@ mod tests {
 
         let _ = pool.close().await;
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn startup_audit_surfaces_scope_escape_warning() {
+        let root = temp_root("dsx_tui_startup_audit");
+        let child = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&child).unwrap();
+        seed_scoped_run(&root, &child).await;
+
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        configure_initial_app(
+            &app,
+            &root,
+            dsx_core::types::PermissionMode::Ask,
+            "https://api.deepseek.com".into(),
+            String::new(),
+            false,
+            None,
+        );
+        load_startup_audit(&app, &root).await;
+
+        let app = app.lock().unwrap();
+        assert!(
+            app.messages
+                .iter()
+                .any(|message| message.content.contains("Workspace audit:"))
+        );
+        assert!(app.scope_lock.warning.contains("scope escape"));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    async fn seed_scoped_run(root: &Path, child: &Path) {
+        let pool = dsx_memory::open(&child.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let id = dsx_memory::start_scoped_agent_run(
+            &pool,
+            &dsx_memory::AgentRunStart {
+                session_id: None,
+                project_root: &child.display().to_string(),
+                task: "use only child scope",
+                launch_scope: &root.display().to_string(),
+                active_scope: &child.display().to_string(),
+                scope_status: "Narrowed",
+                scope_reason: "User selected a child project.",
+            },
+        )
+        .await
+        .unwrap();
+        dsx_memory::finish_agent_run(
+            &pool,
+            &id,
+            &dsx_memory::AgentRunUpdate {
+                status: "completed".into(),
+                scope_violations: 2,
+                last_scope_violation: "read_file denied outside active scope".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
     }
 
     fn temp_root(name: &str) -> std::path::PathBuf {

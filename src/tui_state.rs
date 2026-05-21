@@ -89,6 +89,16 @@ pub fn start_active_scope_indexing(app: SharedApp, active_root: PathBuf, rt: &Ha
     });
 }
 
+pub(crate) async fn load_startup_audit(app: &SharedApp, project_root: &Path) {
+    match crate::workspace_audit::collect_workspace_audit(project_root, 5, true).await {
+        Ok(audit) => apply_startup_audit(app, audit),
+        Err(e) => app
+            .lock()
+            .unwrap()
+            .add_message("error", &format!("Workspace audit failed: {e}")),
+    }
+}
+
 pub(crate) async fn index_active_scope(active_root: &Path) -> anyhow::Result<usize> {
     let db_path = active_root.join(".dsx").join("sessions.db");
     let pool = dsx_memory::open(&db_path).await?;
@@ -134,6 +144,47 @@ fn load_history_event(app: &mut dsx_tui::App, event: &dsx_session::Event) {
             app.tokens = tokens;
         }
     }
+}
+
+fn apply_startup_audit(app: &SharedApp, audit: crate::workspace_audit::WorkspaceAudit) {
+    let mut app = app.lock().unwrap();
+    app.add_message("system", &startup_audit_line(&audit));
+    let warning = startup_audit_warning(&audit);
+    if !warning.is_empty() {
+        app.scope_lock.warning = warning;
+    }
+}
+
+fn startup_audit_line(audit: &crate::workspace_audit::WorkspaceAudit) -> String {
+    format!(
+        "Workspace audit: budget={}, running={}, stale>60m={}, scope_guard={}, line-limit={}",
+        audit.budget,
+        audit.running_runs,
+        audit.stale_runs,
+        audit.scope_violations,
+        if audit.line_violations.is_empty() {
+            "ok"
+        } else {
+            "fail"
+        }
+    )
+}
+
+fn startup_audit_warning(audit: &crate::workspace_audit::WorkspaceAudit) -> String {
+    let mut parts = Vec::new();
+    if audit.running_runs > 0 {
+        parts.push(format!("{} running run(s)", audit.running_runs));
+    }
+    if audit.stale_runs > 0 {
+        parts.push(format!("{} stale run(s)", audit.stale_runs));
+    }
+    if audit.scope_violations > 0 {
+        parts.push(format!("{} scope escape(s)", audit.scope_violations));
+    }
+    if !audit.line_violations.is_empty() {
+        parts.push("line-limit violation(s)".into());
+    }
+    parts.join("; ")
 }
 
 fn ensure_git(project_root: &Path, app: &mut dsx_tui::App) {
