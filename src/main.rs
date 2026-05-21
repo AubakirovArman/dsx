@@ -18,13 +18,15 @@ mod tui_state_tests;
 pub mod tui_task;
 #[cfg(test)]
 mod tui_task_tests;
+pub mod workspace_runs;
 
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
 use handlers::{
-    list_agent_runs, list_sessions, run_edit, run_eval, run_index_build, run_index_search,
-    run_mcp_call, run_mcp_list, run_plan, run_scope_preview, task_preview,
+    list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
+    run_mcp_list, run_plan, run_scope_preview, task_preview,
 };
+use workspace_runs::list_agent_runs;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -175,7 +177,9 @@ async fn run_workspace_action(
 ) -> anyhow::Result<()> {
     match action {
         None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
-        Some(WorkspaceAction::Runs { limit }) => list_agent_runs(&project_root, limit).await,
+        Some(WorkspaceAction::Runs { limit, all }) => {
+            list_agent_runs(&project_root, limit, all).await
+        }
         Some(WorkspaceAction::Resume { id }) => {
             let Some(key) = require_api_key(api_key) else {
                 return Ok(());

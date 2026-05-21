@@ -91,6 +91,9 @@ pub enum WorkspaceAction {
         /// Maximum runs to show
         #[arg(short, long, default_value_t = 20)]
         limit: u32,
+        /// Include .dsx run ledgers in child task scopes
+        #[arg(long)]
+        all: bool,
     },
 }
 
