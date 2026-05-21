@@ -1,7 +1,7 @@
 //! Ratatui runtime loop.
 
 use crate::tui_keys::KeyOutcome;
-use crate::tui_state::{SharedApp, configure_initial_app, load_recent_history, start_indexing};
+use crate::tui_state::{SharedApp, configure_initial_app, load_recent_history};
 use crossterm::event::{self, Event, KeyEventKind};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -33,8 +33,6 @@ pub async fn run_tui(
         api_key.clone(),
         history,
     );
-    start_indexing(app.clone(), project_root.clone(), pool.clone(), &rt);
-
     let result = event_loop(
         &mut terminal,
         app,

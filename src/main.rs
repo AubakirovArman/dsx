@@ -10,6 +10,8 @@ pub mod tui_keys;
 pub mod tui_runner;
 pub mod tui_settings_keys;
 pub mod tui_state;
+#[cfg(test)]
+mod tui_state_tests;
 pub mod tui_task;
 #[cfg(test)]
 mod tui_task_tests;

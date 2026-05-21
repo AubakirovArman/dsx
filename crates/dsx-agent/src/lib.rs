@@ -5,6 +5,8 @@ pub mod budget;
 pub mod classify;
 pub mod runner_sync;
 pub mod scope;
+#[cfg(test)]
+pub mod scope_tests;
 pub mod tool_defs;
 pub mod tool_executor;
 pub mod tool_executor_tests;

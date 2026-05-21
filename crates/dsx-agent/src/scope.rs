@@ -60,14 +60,10 @@ pub fn ensure_active_root(scope: &TaskScope) -> anyhow::Result<()> {
 }
 
 fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath> {
+    let allow_bare = has_scope_hint(task);
     task.split_whitespace()
         .filter_map(|raw| {
-            let cleaned = raw.trim_matches(|c: char| {
-                matches!(
-                    c,
-                    '`' | '"' | '\'' | ',' | '.' | ':' | ';' | ')' | '(' | ']' | '[' | '}' | '{'
-                )
-            });
+            let cleaned = clean_path_token(raw);
             if cleaned.is_empty() {
                 return None;
             }
@@ -78,6 +74,8 @@ fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath>
                 path
             } else if cleaned.contains('/') || cleaned.contains('\\') {
                 launch_root.join(path)
+            } else if allow_bare {
+                bare_child_candidate(launch_root, cleaned, task)?
             } else {
                 return None;
             };
@@ -87,6 +85,100 @@ fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath>
             })
         })
         .collect()
+}
+
+fn bare_child_candidate(launch_root: &Path, token: &str, task: &str) -> Option<PathBuf> {
+    if !safe_bare_name(token) {
+        return None;
+    }
+    let candidate = launch_root.join(token);
+    if candidate.is_dir() || (has_creation_hint(task) && plausible_missing_project_name(token)) {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+fn plausible_missing_project_name(token: &str) -> bool {
+    token
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+}
+
+fn safe_bare_name(token: &str) -> bool {
+    if token == "." || token == ".." || scope_noise_word(token) {
+        return false;
+    }
+    token
+        .chars()
+        .all(|ch| ch.is_alphanumeric() || matches!(ch, '-' | '_'))
+}
+
+fn scope_noise_word(token: &str) -> bool {
+    matches!(
+        token.to_lowercase().as_str(),
+        "folder"
+            | "directory"
+            | "workspace"
+            | "project"
+            | "repo"
+            | "only"
+            | "inside"
+            | "in"
+            | "to"
+            | "for"
+            | "use"
+            | "в"
+            | "во"
+            | "для"
+            | "папку"
+            | "папка"
+            | "папке"
+            | "директорию"
+            | "каталог"
+            | "проект"
+            | "только"
+            | "используй"
+            | "создай"
+    )
+}
+
+fn clean_path_token(raw: &str) -> &str {
+    let trimmed = raw
+        .trim_matches(|c: char| matches!(c, '`' | '"' | '\'' | ')' | '(' | ']' | '[' | '}' | '{'));
+    trimmed.trim_end_matches([',', '.', ':', ';'])
+}
+
+fn has_creation_hint(task: &str) -> bool {
+    let lower = task.to_lowercase();
+    ["create", "new", "scaffold", "созд", "нов", "сгенер"]
+        .iter()
+        .any(|hint| lower.contains(hint))
+}
+
+fn has_scope_hint(task: &str) -> bool {
+    let lower = task.to_lowercase();
+    [
+        "folder",
+        "directory",
+        "workspace",
+        "project",
+        "repo",
+        "only",
+        "inside",
+        "use",
+        "пап",
+        "директор",
+        "каталог",
+        "проект",
+        "репозитор",
+        "воркспейс",
+        "только",
+        "использ",
+        "внутри",
+    ]
+    .iter()
+    .any(|hint| lower.contains(hint))
 }
 
 fn scope_candidate(launch_root: &Path, candidate: &ExplicitPath) -> anyhow::Result<PathBuf> {
@@ -142,63 +234,4 @@ fn nearest_existing_parent(path: &Path) -> anyhow::Result<PathBuf> {
             .ok_or_else(|| anyhow::anyhow!("path has no existing parent"))?;
     }
     Ok(current.canonicalize()?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn narrows_to_absolute_subdirectory() {
-        let root = std::env::temp_dir().join("dsx_scope_abs");
-        let target = root.join("sites/1234");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&target).unwrap();
-
-        let task = format!("создай проект только в {}", target.display());
-        let scope = resolve_task_scope(&root, &task).unwrap();
-
-        assert_eq!(scope.active_root, target.canonicalize().unwrap());
-        assert!(scope.narrowed);
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn ignores_paths_outside_launch_workspace() {
-        let root = std::env::temp_dir().join("dsx_scope_inside");
-        let outside = std::env::temp_dir().join("dsx_scope_outside");
-        let _ = std::fs::remove_dir_all(&root);
-        let _ = std::fs::remove_dir_all(&outside);
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::create_dir_all(&outside).unwrap();
-
-        let task = format!("используй {}", outside.display());
-        let scope = resolve_task_scope(&root, &task).unwrap();
-
-        assert_eq!(scope.active_root, root.canonicalize().unwrap());
-        assert!(!scope.narrowed);
-
-        let _ = std::fs::remove_dir_all(&root);
-        let _ = std::fs::remove_dir_all(&outside);
-    }
-
-    #[test]
-    fn narrows_to_missing_directory_inside_launch_workspace() {
-        let root = std::env::temp_dir().join("dsx_scope_missing_dir");
-        let target = root.join("sites/1234");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("sites")).unwrap();
-
-        let task = format!("создай проект только в {}", target.display());
-        let scope = resolve_task_scope(&root, &task).unwrap();
-
-        assert_eq!(scope.active_root, target);
-        assert!(scope.narrowed);
-        assert!(!scope.active_root.exists());
-        ensure_active_root(&scope).unwrap();
-        assert!(scope.active_root.is_dir());
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
 }

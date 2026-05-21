@@ -1,6 +1,6 @@
 //! Shared TUI state bootstrap helpers.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
@@ -36,8 +36,15 @@ pub fn configure_initial_app(
     app.mode = initial_mode.as_str().to_string();
     let budget_status = dsx_agent::budget::format_limits(dsx_agent::budget::current_limits());
     app.budget_status = budget_status.clone();
-    app.add_message("system", &format!("Project: {}", project_root.display()));
+    app.add_message(
+        "system",
+        &format!("Launch workspace: {}", project_root.display()),
+    );
     app.add_message("system", &format!("Budget fuse: {budget_status}"));
+    app.add_message(
+        "system",
+        "Semantic indexing deferred until active task scope.",
+    );
     app.add_message(
         "system",
         &format!(
@@ -48,31 +55,37 @@ pub fn configure_initial_app(
     );
     load_history(&mut app, history_events);
     ensure_git(project_root, &mut app);
-    if let Ok(files) = dsx_index::scan_project(project_root) {
+    if let Ok(files) = dsx_fs::list_files(project_root) {
         app.file_tree = files.into_iter().take(50).collect();
     }
 }
 
-pub fn start_indexing(
-    app: SharedApp,
-    project_root: std::path::PathBuf,
-    pool: Option<sqlx::SqlitePool>,
-    rt: &Handle,
-) {
-    let Some(pool) = pool else {
-        return;
-    };
+pub fn start_active_scope_indexing(app: SharedApp, active_root: PathBuf, rt: &Handle) {
     rt.spawn(async move {
-        if let Ok(count) = dsx_index::build_symbol_index(&project_root, &pool).await {
-            let mut app = app.lock().unwrap();
-            app.add_message(
-                "system",
-                &format!(
-                    "✓ Semantic Indexing complete: {count} structural symbols indexed in SQLite."
-                ),
-            );
+        match index_active_scope(&active_root).await {
+            Ok(count) => {
+                let mut app = app.lock().unwrap();
+                app.add_message(
+                    "system",
+                    &format!(
+                        "✓ Active-scope index complete: {count} symbols in {}.",
+                        active_root.display()
+                    ),
+                );
+            }
+            Err(e) => {
+                app.lock()
+                    .unwrap()
+                    .add_message("error", &format!("Active-scope indexing failed: {e}"));
+            }
         }
     });
+}
+
+pub(crate) async fn index_active_scope(active_root: &Path) -> anyhow::Result<usize> {
+    let db_path = active_root.join(".dsx").join("sessions.db");
+    let pool = dsx_memory::open(&db_path).await?;
+    dsx_index::build_symbol_index(active_root, &pool).await
 }
 
 fn load_history(app: &mut dsx_tui::App, history_events: HistoryEvents) {
