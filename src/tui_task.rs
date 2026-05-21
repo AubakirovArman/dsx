@@ -117,10 +117,7 @@ pub(crate) fn prepare_task(
         app.add_message("system", message);
         return None;
     }
-    if let Some(message) =
-        crate::agent_preflight::blocked_agent_start_text(project_root, &task, app.allow_wide_scope)
-    {
-        app.add_message("system", &message);
+    if crate::tui_preflight::block_if_needed(&mut app, project_root, &task) {
         return None;
     }
     let scope = crate::task_scope::resolve_task_scope(project_root, &task);

@@ -23,6 +23,7 @@ mod task_scope_tests;
 pub mod tui_keys;
 #[cfg(test)]
 mod tui_keys_tests;
+pub mod tui_preflight;
 pub mod tui_runner;
 pub mod tui_scope_guard;
 pub mod tui_settings_keys;

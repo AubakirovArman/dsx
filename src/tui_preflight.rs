@@ -1,0 +1,30 @@
+//! TUI updates for blocked agent-start preflight decisions.
+
+use std::path::Path;
+
+pub(crate) fn block_if_needed(app: &mut dsx_tui::App, project_root: &Path, task: &str) -> bool {
+    let Some(preflight) =
+        crate::agent_preflight::blocked_agent_start(project_root, task, app.allow_wide_scope)
+    else {
+        return false;
+    };
+    let message = crate::agent_preflight::render_text(&preflight);
+    app.task_brief = dsx_tui::TaskBriefPanel {
+        goal: preflight.task.clone(),
+        done: "Task blocked before model call.".into(),
+        plan: "1. Pick an explicit child folder\n2. Retry the task or enable wide scope policy"
+            .into(),
+        last_changes: preflight.reason.clone(),
+        next_step: "Add a folder like ./1234, run preflight, or use --allow-wide-scope.".into(),
+        active_scope: preflight.active.clone(),
+    };
+    app.scope_lock = dsx_tui::ScopeLockPanel {
+        launch_scope: preflight.launch,
+        active_scope: preflight.active,
+        status: "Blocked".into(),
+        reason: preflight.reason,
+        warning: "No model call or tool execution started.".into(),
+    };
+    app.add_message("system", &message);
+    true
+}

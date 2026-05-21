@@ -82,14 +82,13 @@ mod tests {
     }
 
     #[test]
-    fn blocked_agent_start_text_renders_same_preflight_report() {
+    fn render_text_renders_same_preflight_report() {
         let root = temp_root("dsx_preflight_block_text");
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("1234")).unwrap();
 
-        let text =
-            crate::agent_preflight::blocked_agent_start_text(&root, "доработай проект", false)
-                .unwrap();
+        let preflight = build_agent_preflight(&root, "доработай проект", false);
+        let text = render_text(&preflight);
 
         assert!(text.contains("Agent preflight"));
         assert!(text.contains("Policy source: container_guard"));

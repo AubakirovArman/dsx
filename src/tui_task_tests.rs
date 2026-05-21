@@ -86,6 +86,9 @@ mod tests {
         let app = app.lock().unwrap();
         assert_eq!(app.input, "доработай проект");
         assert_eq!(app.active_run_id, None);
+        assert_eq!(app.task_brief.done, "Task blocked before model call.");
+        assert_eq!(app.scope_lock.status, "Blocked");
+        assert!(app.scope_lock.warning.contains("No model call"));
         assert!(
             app.messages
                 .iter()
