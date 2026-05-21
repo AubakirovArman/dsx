@@ -10,6 +10,7 @@ pub mod draw_status;
 pub mod draw_workflow;
 pub mod folder_notes;
 pub mod i18n;
+pub mod stream_events;
 pub mod types;
 
 pub use types::{
@@ -49,6 +50,8 @@ pub struct App {
     pub compaction_events: u64,
     pub compacted_messages: u64,
     pub estimated_tokens_saved: u64,
+    pub scope_violations: u64,
+    pub last_scope_violation: String,
     pub task_brief: TaskBriefPanel,
     pub scope_lock: ScopeLockPanel,
     pub folder_notes: Vec<FolderNote>,
@@ -108,6 +111,8 @@ impl App {
             compaction_events: 0,
             compacted_messages: 0,
             estimated_tokens_saved: 0,
+            scope_violations: 0,
+            last_scope_violation: String::new(),
             task_brief: TaskBriefPanel::default(),
             scope_lock: ScopeLockPanel::default(),
             folder_notes: Vec::new(),
@@ -119,80 +124,6 @@ impl App {
     /// Retrieve localized text constant for key.
     pub fn tr(&self, key: &str) -> &'static str {
         i18n::tr(self.lang, key)
-    }
-
-    /// Process a streaming event from the agent.
-    pub fn handle_stream_event(&mut self, event: &AgentStreamEvent) {
-        match event {
-            AgentStreamEvent::Reasoning(r) => {
-                self.current_reasoning.push_str(r);
-            }
-            AgentStreamEvent::ContentToken(token) => {
-                // Clear reasoning on first content token so the reasoning panel closes
-                if !self.current_reasoning.is_empty() {
-                    self.current_reasoning.clear();
-                }
-                // Append to the last assistant message, or create one
-                if let Some(last) = self.messages.last_mut()
-                    && last.role == "assistant"
-                {
-                    last.content.push_str(token);
-                    return;
-                }
-                self.messages.push(ChatMessage {
-                    role: "assistant".into(),
-                    content: token.clone(),
-                });
-            }
-            AgentStreamEvent::ToolResult {
-                name,
-                success,
-                summary,
-            } => {
-                let status = if *success { "✓" } else { "✗" };
-                let short: String = summary.chars().take(150).collect();
-                self.push_tool_event(name, *success, &short);
-                self.add_message("tool", &format!("{status} {name} — {short}"));
-            }
-            AgentStreamEvent::TranscriptCompact {
-                removed_messages,
-                retained_messages,
-                estimated_tokens_saved,
-            } => {
-                self.compaction_events += 1;
-                self.compacted_messages += *removed_messages as u64;
-                self.estimated_tokens_saved += *estimated_tokens_saved as u64;
-                let summary = format!(
-                    "{removed_messages} msg compacted, ~{estimated_tokens_saved} tok saved, {retained_messages} retained"
-                );
-                self.push_tool_event("context_compact", true, &summary);
-                self.add_message("system", &format!("Context compacted: {summary}"));
-            }
-            AgentStreamEvent::Done {
-                answer: _ans,
-                iterations,
-                tokens,
-                cost,
-            } => {
-                self.tokens += tokens;
-                self.cost += cost;
-                self.current_reasoning.clear();
-                self.agent_task =
-                    AgentTask::Done(format!("{} iterations, ${:.4}", iterations, cost));
-                self.task_brief.done = format!("Completed in {iterations} iteration(s).");
-                self.task_brief.last_changes = "Final assistant response recorded.".into();
-                self.task_brief.next_step = "Review result or enter the next task.".into();
-            }
-            AgentStreamEvent::Error(err) => {
-                self.add_message("error", err);
-                self.current_reasoning.clear();
-                self.agent_task = AgentTask::Error(err.clone());
-                self.task_brief.done = "Run failed.".into();
-                self.task_brief.last_changes = err.chars().take(220).collect();
-                self.task_brief.next_step =
-                    "Inspect the error and retry with a narrower task.".into();
-            }
-        }
     }
 
     pub fn begin_task(&mut self, task: &str, active_scope: &str) {
@@ -241,6 +172,8 @@ impl App {
         self.compaction_events = 0;
         self.compacted_messages = 0;
         self.estimated_tokens_saved = 0;
+        self.scope_violations = 0;
+        self.last_scope_violation.clear();
     }
 
     pub fn add_message(&mut self, role: &str, content: &str) {
@@ -248,29 +181,6 @@ impl App {
             role: role.into(),
             content: content.into(),
         });
-    }
-
-    fn push_tool_event(&mut self, name: &str, success: bool, summary: &str) {
-        let status = if success { "ok" } else { "failed" };
-        self.tool_timeline.push(ToolTimelineEntry {
-            name: name.into(),
-            status: status.into(),
-            summary: summary.into(),
-        });
-        if self.tool_timeline.len() > 20 {
-            let overflow = self.tool_timeline.len() - 20;
-            self.tool_timeline.drain(0..overflow);
-        }
-        self.task_brief.done = format!("Tool {name} finished with status {status}.");
-        self.task_brief.last_changes = summary.into();
-        self.task_brief.next_step = if success {
-            "Continue from the latest tool result.".into()
-        } else {
-            "Review failed tool output before continuing.".into()
-        };
-        let active = self.task_brief.active_scope.clone();
-        let next_step = self.task_brief.next_step.clone();
-        self.upsert_folder_note(&active, summary, &next_step);
     }
 }
 

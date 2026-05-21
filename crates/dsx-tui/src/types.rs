@@ -117,6 +117,8 @@ pub enum AgentStreamEvent {
     ToolResult {
         name: String,
         success: bool,
+        denied: bool,
+        risk: String,
         summary: String,
     },
     /// Older transcript messages were compacted before the next API call.

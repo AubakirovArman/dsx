@@ -213,6 +213,8 @@ async fn run_streaming_internal(
             let _ = tx.send(StreamEvent::ToolResult {
                 name: result.name.clone(),
                 success: result.success,
+                denied: result.denied,
+                risk: format!("{:?}", result.risk),
                 summary: result_summary,
             });
             all_tool_results.push(result.clone());

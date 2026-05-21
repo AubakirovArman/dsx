@@ -73,6 +73,8 @@ mod tests {
         app.handle_stream_event(&AgentStreamEvent::ToolResult {
             name: "read_file".into(),
             success: true,
+            denied: false,
+            risk: "Read".into(),
             summary: "inspected src/main.rs".into(),
         });
 
@@ -83,6 +85,26 @@ mod tests {
             .unwrap();
         assert_eq!(note.summary, "inspected src/main.rs");
         assert!(note.next_step.contains("Continue"));
+    }
+
+    #[test]
+    fn blocked_scope_tool_result_updates_visible_guardrails() {
+        let mut app = App::new();
+        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites/1234", true);
+
+        app.handle_stream_event(&AgentStreamEvent::ToolResult {
+            name: "read_file".into(),
+            success: false,
+            denied: true,
+            risk: "Blocked".into(),
+            summary: "Path denied by active scope: path traversal blocked".into(),
+        });
+
+        assert_eq!(app.scope_violations, 1);
+        assert!(app.last_scope_violation.contains("read_file"));
+        assert!(app.scope_lock.warning.contains("blocked scope escape"));
+        assert_eq!(app.tool_timeline.last().unwrap().status, "blocked");
+        assert!(app.task_brief.next_step.contains("active scope"));
     }
 
     #[test]

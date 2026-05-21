@@ -12,16 +12,22 @@ pub fn convert_event(ev: &dsx_provider::streaming::StreamEvent) -> dsx_tui::Agen
             dsx_tui::AgentStreamEvent::ToolResult {
                 name: tc.name.clone(),
                 success: true,
+                denied: false,
+                risk: "Read".into(),
                 summary: format!("requested {}", tc.name),
             }
         }
         dsx_provider::streaming::StreamEvent::ToolResult {
             name,
             success,
+            denied,
+            risk,
             summary,
         } => dsx_tui::AgentStreamEvent::ToolResult {
             name: name.clone(),
             success: *success,
+            denied: *denied,
+            risk: risk.clone(),
             summary: summary.clone(),
         },
         dsx_provider::streaming::StreamEvent::TranscriptCompact {

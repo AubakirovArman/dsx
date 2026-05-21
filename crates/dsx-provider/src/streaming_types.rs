@@ -74,6 +74,8 @@ pub enum StreamEvent {
     ToolResult {
         name: String,
         success: bool,
+        denied: bool,
+        risk: String,
         summary: String,
     },
     TranscriptCompact {

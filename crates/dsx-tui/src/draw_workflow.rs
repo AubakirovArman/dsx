@@ -199,7 +199,9 @@ impl App {
 
     fn draw_scope_lock_panel(&self, frame: &mut Frame, area: Rect) {
         let s = &self.scope_lock;
-        let color = if s.status == "Narrowed" {
+        let color = if self.scope_violations > 0 {
+            Color::LightRed
+        } else if s.status == "Narrowed" {
             Color::LightGreen
         } else {
             Color::LightYellow
@@ -209,6 +211,20 @@ impl App {
         push_inline(&mut lines, "Launch", &s.launch_scope, Color::Gray);
         push_inline(&mut lines, "Active", &s.active_scope, Color::LightCyan);
         push_inline(&mut lines, "Why", &s.reason, Color::White);
+        if self.scope_violations > 0 {
+            push_inline(
+                &mut lines,
+                "Blocked",
+                &format!("{} scope escape(s)", self.scope_violations),
+                Color::LightRed,
+            );
+            push_inline(
+                &mut lines,
+                "Last",
+                &self.last_scope_violation,
+                Color::LightRed,
+            );
+        }
         if !s.warning.trim().is_empty() {
             push_inline(&mut lines, "Check", &s.warning, Color::LightYellow);
         }
