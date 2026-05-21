@@ -16,6 +16,15 @@ pub async fn exec_run_command(id: &str, args: &serde_json::Value, ctx: &ToolCont
             false,
         );
     }
+    if let Err(e) = super::command_scope::validate_command_scope(command, &ctx.workspace) {
+        return result(
+            id,
+            format!("Command denied by active scope: {e}"),
+            false,
+            RiskLevel::Blocked,
+            true,
+        );
+    }
 
     let cmd_risk = classify_command(command);
     let action = required_action(cmd_risk, ctx.mode);

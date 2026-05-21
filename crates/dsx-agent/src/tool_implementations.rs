@@ -1,5 +1,6 @@
 //! DSX Agent — concrete tool execution implementations.
 
+pub mod command_scope;
 pub mod command_tools;
 pub mod file_tools;
 pub mod mcp_tools;

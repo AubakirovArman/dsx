@@ -20,7 +20,7 @@ impl ToolRegistry {
         vec![
             ToolSpec {
                 name: "read_file".into(),
-                description: "Read a file from the workspace.".into(),
+                description: "Read a file from the active task scope.".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -32,7 +32,7 @@ impl ToolRegistry {
             },
             ToolSpec {
                 name: "list_files".into(),
-                description: "List files in a directory.".into(),
+                description: "List files in a directory inside the active task scope.".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -43,7 +43,7 @@ impl ToolRegistry {
             },
             ToolSpec {
                 name: "grep".into(),
-                description: "Search for a pattern in workspace files.".into(),
+                description: "Search for a pattern inside the active task scope.".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -56,7 +56,7 @@ impl ToolRegistry {
             },
             ToolSpec {
                 name: "run_command".into(),
-                description: "Run a shell command in the workspace (requires approval).".into(),
+                description: "Run a shell command in the active task scope (requires approval).".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -68,7 +68,7 @@ impl ToolRegistry {
             },
             ToolSpec {
                 name: "write_file".into(),
-                description: "Create or overwrite a UTF-8 text file in the workspace. Creates parent directories when needed.".into(),
+                description: "Create or overwrite a UTF-8 text file in the active task scope. Creates parent directories when needed.".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -82,7 +82,7 @@ impl ToolRegistry {
             },
             ToolSpec {
                 name: "propose_patch".into(),
-                description: "Propose a code change as a SEARCH/REPLACE patch.".into(),
+                description: "Propose a code change inside the active task scope as a SEARCH/REPLACE patch.".into(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {

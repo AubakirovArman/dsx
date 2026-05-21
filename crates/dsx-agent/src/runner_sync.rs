@@ -17,6 +17,7 @@ const FLASH_OUTPUT_COST: f64 = 0.28;
 /// Execute a natural language task and block until a final answer is returned.
 pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcome> {
     let scope = crate::scope::resolve_task_scope(&config.project_root, task)?;
+    crate::scope::ensure_active_root(&scope)?;
     let clean_task = crate::brief::clean_task_input(task);
     let project_root = &scope.active_root;
     let client = dsx_provider::client::DeepSeekClient::new_with_base(

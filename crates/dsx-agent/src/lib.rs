@@ -59,6 +59,7 @@ async fn run_streaming_internal(
     tx: mpsc::UnboundedSender<StreamEvent>,
 ) -> anyhow::Result<AgentOutcome> {
     let scope = scope::resolve_task_scope(&config.project_root, task)?;
+    scope::ensure_active_root(&scope)?;
     let clean_task = brief::clean_task_input(task);
     let project_root = &scope.active_root;
     let client = dsx_provider::client::DeepSeekClient::new_with_base(

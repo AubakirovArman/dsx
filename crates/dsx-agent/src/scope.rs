@@ -9,6 +9,12 @@ pub struct TaskScope {
     pub narrowed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ExplicitPath {
+    path: PathBuf,
+    directory_hint: bool,
+}
+
 impl TaskScope {
     pub fn system_note(&self) -> String {
         if self.narrowed {
@@ -46,7 +52,14 @@ pub fn resolve_task_scope(launch_root: &Path, task: &str) -> anyhow::Result<Task
     })
 }
 
-fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<PathBuf> {
+pub fn ensure_active_root(scope: &TaskScope) -> anyhow::Result<()> {
+    if scope.narrowed && !scope.active_root.exists() {
+        std::fs::create_dir_all(&scope.active_root)?;
+    }
+    Ok(())
+}
+
+fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath> {
     task.split_whitespace()
         .filter_map(|raw| {
             let cleaned = raw.trim_matches(|c: char| {
@@ -59,20 +72,26 @@ fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<PathBuf> {
                 return None;
             }
             let path = PathBuf::from(cleaned);
-            if path.is_absolute() {
-                Some(path)
+            let directory_hint =
+                cleaned.ends_with('/') || cleaned.ends_with('\\') || path.extension().is_none();
+            let path = if path.is_absolute() {
+                path
             } else if cleaned.contains('/') || cleaned.contains('\\') {
-                Some(launch_root.join(path))
+                launch_root.join(path)
             } else {
-                None
-            }
+                return None;
+            };
+            Some(ExplicitPath {
+                path,
+                directory_hint,
+            })
         })
         .collect()
 }
 
-fn scope_candidate(launch_root: &Path, candidate: &Path) -> anyhow::Result<PathBuf> {
-    let path = if candidate.exists() {
-        let canonical = candidate.canonicalize()?;
+fn scope_candidate(launch_root: &Path, candidate: &ExplicitPath) -> anyhow::Result<PathBuf> {
+    let path = if candidate.path.exists() {
+        let canonical = candidate.path.canonicalize()?;
         if canonical.is_file() {
             canonical
                 .parent()
@@ -81,14 +100,38 @@ fn scope_candidate(launch_root: &Path, candidate: &Path) -> anyhow::Result<PathB
         } else {
             canonical
         }
+    } else if candidate.directory_hint {
+        missing_path_under_launch(launch_root, &candidate.path)?
     } else {
-        nearest_existing_parent(candidate)?
+        let parent = candidate
+            .path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("path has no parent"))?;
+        missing_path_under_launch(launch_root, parent)?
     };
 
     if !path.starts_with(launch_root) {
         anyhow::bail!("task path is outside launch workspace: {}", path.display());
     }
     Ok(path)
+}
+
+fn missing_path_under_launch(launch_root: &Path, path: &Path) -> anyhow::Result<PathBuf> {
+    let existing = nearest_existing_parent(path)?;
+    let canonical = existing.canonicalize()?;
+    if !canonical.starts_with(launch_root) {
+        anyhow::bail!("task path is outside launch workspace: {}", path.display());
+    }
+    let tail = path.strip_prefix(existing)?;
+    if tail.components().any(|part| {
+        matches!(
+            part,
+            std::path::Component::ParentDir | std::path::Component::RootDir
+        )
+    }) {
+        anyhow::bail!("task path contains unsafe traversal: {}", path.display());
+    }
+    Ok(canonical.join(tail))
 }
 
 fn nearest_existing_parent(path: &Path) -> anyhow::Result<PathBuf> {
@@ -138,5 +181,24 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn narrows_to_missing_directory_inside_launch_workspace() {
+        let root = std::env::temp_dir().join("dsx_scope_missing_dir");
+        let target = root.join("sites/1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("sites")).unwrap();
+
+        let task = format!("создай проект только в {}", target.display());
+        let scope = resolve_task_scope(&root, &task).unwrap();
+
+        assert_eq!(scope.active_root, target);
+        assert!(scope.narrowed);
+        assert!(!scope.active_root.exists());
+        ensure_active_root(&scope).unwrap();
+        assert!(scope.active_root.is_dir());
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

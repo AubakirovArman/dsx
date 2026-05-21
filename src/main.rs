@@ -1,6 +1,7 @@
 //! DSX Code — terminal coding agent entrypoint.
 
 pub mod cli;
+pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
 pub mod session_state;
@@ -63,6 +64,9 @@ async fn main() -> anyhow::Result<()> {
             tasks_file,
             no_agent,
         }) => run_eval(project_root, api_key, api_base, tasks_file, mode, no_agent).await?,
+        Some(Command::Doctor) => {
+            doctor::run_doctor(&project_root, &api_base, api_key.as_deref()).await?
+        }
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,
         Some(Command::Workspace { action }) => {

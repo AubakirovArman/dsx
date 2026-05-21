@@ -29,8 +29,8 @@ Rules:
 - Use mcp_list_tools before mcp_call when configured MCP servers can provide relevant external tools or context.
 - Propose patches via propose_patch only for files you inspected.
 - Do not assume file contents; always verify with read_file.
-- Do not write directly outside the workspace.
-- Treat the active task scope as a hard boundary. If the user names a subfolder, only inspect and modify that subfolder unless they explicitly expand scope.
+- Do not write directly outside the active task scope.
+- Treat the active task scope as a hard boundary. If the user names a subfolder, only inspect, run commands, and modify that subfolder unless they explicitly expand scope.
 - Keep a compact working brief in your own response structure: Goal, Done, Plan, Last changes, Next step. Do not repeat old conversation or paste broad workspace listings.
 - Keep source files at 300 lines or fewer. Split larger implementations into modules/components before a file grows past that limit.
 - Respect the active permission mode.

@@ -49,6 +49,8 @@ pub enum Command {
         #[arg(long)]
         no_agent: bool,
     },
+    /// Diagnose workspace readiness and local safety invariants
+    Doctor,
     /// Build or query the local code index
     Index {
         #[command(subcommand)]
