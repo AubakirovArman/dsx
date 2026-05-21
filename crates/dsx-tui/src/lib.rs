@@ -1,7 +1,10 @@
 //! DSX TUI — ratatui-based interactive terminal workspace.
 
 pub mod draw;
+pub mod draw_chat;
+pub mod draw_input;
 pub mod draw_settings;
+pub mod draw_status;
 pub mod draw_workflow;
 pub mod i18n;
 pub mod types;
