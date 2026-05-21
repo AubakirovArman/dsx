@@ -106,6 +106,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn context_preview_skips_generated_file_tree_dirs() {
+        let root = temp_root("dsx_context_preview_generated");
+        let child = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(child.join("src")).unwrap();
+        std::fs::create_dir_all(child.join("node_modules/pkg")).unwrap();
+        std::fs::create_dir_all(child.join("target/debug")).unwrap();
+        std::fs::create_dir_all(child.join("dist")).unwrap();
+
+        let preview = build_context_preview(&root, "build 1234").await.unwrap();
+
+        assert!(preview.project_context.contains("src/"));
+        assert!(!preview.project_context.contains("node_modules/"));
+        assert!(!preview.project_context.contains("target/"));
+        assert!(!preview.project_context.contains("dist/"));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
     async fn context_preview_check_rejects_over_budget() {
         let root = temp_root("dsx_context_preview_check");
         let _ = std::fs::remove_dir_all(&root);

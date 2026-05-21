@@ -32,6 +32,9 @@ pub fn list_files(dir: &Path) -> anyhow::Result<Vec<String>> {
             if file_type.is_dir() {
                 label.push('/');
             }
+            if skip_context_entry(&label) {
+                continue;
+            }
             if file_type.is_dir() || file_type.is_file() {
                 entries.push(label);
             }
@@ -39,6 +42,22 @@ pub fn list_files(dir: &Path) -> anyhow::Result<Vec<String>> {
     }
     entries.sort();
     Ok(entries)
+}
+
+fn skip_context_entry(label: &str) -> bool {
+    matches!(
+        label,
+        ".git/"
+            | ".dsx/"
+            | "target/"
+            | "node_modules/"
+            | "vendor/"
+            | "dist/"
+            | "build/"
+            | ".next/"
+            | "coverage/"
+            | "__pycache__/"
+    )
 }
 
 /// Read file content as UTF-8 string.
@@ -105,6 +124,28 @@ mod tests {
         assert!(files.contains(&"1234/".into()));
         assert!(files.contains(&"Cargo.toml".into()));
         assert!(!files.contains(&"main.rs".into()));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn list_files_skips_generated_and_vendor_directories() {
+        let root = temp_root("dsx_fs_skip_generated");
+        let _ = std::fs::remove_dir_all(&root);
+        for dir in ["target", "node_modules", "dist", "vendor", ".dsx"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("README.md"), "readme\n").unwrap();
+
+        let files = list_files(&root).unwrap();
+
+        assert!(files.contains(&"src/".into()));
+        assert!(files.contains(&"README.md".into()));
+        assert!(!files.contains(&"target/".into()));
+        assert!(!files.contains(&"node_modules/".into()));
+        assert!(!files.contains(&"dist/".into()));
+        assert!(!files.contains(&".dsx/".into()));
 
         let _ = std::fs::remove_dir_all(root);
     }
