@@ -1,6 +1,5 @@
 //! DSX TUI — rendering and drawing layout helpers.
 
-use crate::types::Language;
 use crate::App;
 use crate::i18n::tr;
 use ratatui::{
@@ -71,7 +70,16 @@ impl App {
     }
 
     fn draw_file_tree(&self, frame: &mut Frame, area: Rect) {
-        let items: Vec<ListItem> = self.file_tree.iter().map(|f| {
+        let height = area.height.saturating_sub(3) as usize; // reserve space for title/borders and "+N more" indicator
+        let show_more = self.file_tree.len() > height;
+        
+        let visible_files: Vec<&String> = if show_more {
+            self.file_tree.iter().take(height).collect()
+        } else {
+            self.file_tree.iter().collect()
+        };
+
+        let mut items: Vec<ListItem> = visible_files.iter().map(|f| {
             let style = if f.ends_with('/') || f.contains('/') {
                 Style::default().fg(Color::LightBlue).add_modifier(Modifier::BOLD)
             } else if f.ends_with(".rs") {
@@ -83,6 +91,14 @@ impl App {
             };
             ListItem::new(Line::from(Span::styled(format!("  {}", f), style)))
         }).collect();
+
+        if show_more {
+            let remaining = self.file_tree.len() - height;
+            items.push(ListItem::new(Line::from(Span::styled(
+                format!("  ... (+{} more files)", remaining),
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)
+            ))));
+        }
 
         let list = List::new(items)
             .block(
@@ -98,7 +114,26 @@ impl App {
     }
 
     fn draw_reasoning(&self, frame: &mut Frame, area: Rect) {
-        let text = Paragraph::new(self.current_reasoning.as_str())
+        let mut lines: Vec<Line> = Vec::new();
+        for line in self.current_reasoning.lines() {
+            lines.push(Line::from(vec![
+                Span::styled(line, Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
+            ]));
+        }
+
+        // Auto-scroll reasoning process: keep thoughts locked to the bottom
+        let total_lines = lines.len();
+        let height = area.height.saturating_sub(2) as usize;
+        let max_scroll = total_lines.saturating_sub(height);
+        
+        let visible_lines = if max_scroll > 0 {
+            lines[max_scroll..].to_vec()
+        } else {
+            lines
+        };
+
+        let text = Text::from(visible_lines);
+        let paragraph = Paragraph::new(text)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -106,10 +141,9 @@ impl App {
                     .border_style(Style::default().fg(Color::LightMagenta))
                     .title(Span::styled(tr(self.lang, "reasoning_title"), Style::default().fg(Color::LightMagenta).add_modifier(Modifier::BOLD)))
             )
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
             .wrap(Wrap { trim: false });
 
-        frame.render_widget(text, area);
+        frame.render_widget(paragraph, area);
     }
 
     fn draw_diff(&self, frame: &mut Frame, area: Rect) {

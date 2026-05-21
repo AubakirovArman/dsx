@@ -449,58 +449,83 @@ impl App {
                 Span::raw(" | "),
                 Span::styled("↑/↓", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
                 Span::raw(match self.lang {
-                    Language::Russian => ":навигация ",
-                    Language::Kazakh => ":бағыттау ",
-                    Language::Chinese => ":选择 ",
-                    Language::English => ":navigate ",
+                    Language::Russian => ":нав ",
+                    Language::Kazakh => ":бағ ",
+                    Language::Chinese => ":选 ",
+                    Language::English => ":nav ",
                 }),
                 Span::styled("←/→", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
                 Span::raw(match self.lang {
-                    Language::Russian => ":изменить ",
-                    Language::Kazakh => ":өзгерту ",
-                    Language::Chinese => ":修改 ",
-                    Language::English => ":modify ",
+                    Language::Russian => ":изм ",
+                    Language::Kazakh => ":өзг ",
+                    Language::Chinese => ":改 ",
+                    Language::English => ":mod ",
                 }),
                 Span::styled("Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" Esc", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
                 Span::raw(match self.lang {
-                    Language::Russian => ":действие ",
-                    Language::Kazakh => ":әрекет ",
-                    Language::Chinese => ":执行 ",
-                    Language::English => ":action ",
-                }),
-                Span::styled("Esc", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
-                Span::raw(match self.lang {
-                    Language::Russian => ":выход ",
+                    Language::Russian => ":вых ",
                     Language::Kazakh => ":қайту ",
-                    Language::Chinese => ":返回 ",
-                    Language::English => ":exit_config ",
+                    Language::Chinese => ":返 ",
+                    Language::English => ":exit ",
                 }),
                 Span::styled("Ctrl+C", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
                 Span::raw(tr(self.lang, "status_quit")),
             ]
         } else {
-            vec![
-                Span::styled(format!(" {} ", task_indicator), Style::default().fg(Color::Black).bg(Color::LightGreen).add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-                Span::styled(format!(" [{}] ", self.mode.to_uppercase()), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" | model: "),
-                Span::styled(self.model.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                Span::raw(" | tokens: "),
-                Span::styled(self.tokens.to_string(), Style::default().fg(Color::White)),
-                Span::raw(" | cost: "),
-                Span::styled(cost_str, Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
-                Span::raw(" | "),
-                Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::raw(tr(self.lang, "status_settings_toggle")),
-                Span::styled("Ctrl+T", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::raw(tr(self.lang, "status_tree_toggle")),
-                Span::styled("Ctrl+D", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::raw(tr(self.lang, "status_diff_toggle")),
-                Span::styled("Ctrl+U", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
-                Span::raw(tr(self.lang, "status_undo_toggle")),
-                Span::styled("Ctrl+C", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
-                Span::raw(tr(self.lang, "status_quit")),
-            ]
+            let width = area.width;
+            if width >= 110 {
+                // Full gorgeous layout
+                vec![
+                    Span::styled(format!(" {} ", task_indicator), Style::default().fg(Color::Black).bg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+                    Span::raw(" "),
+                    Span::styled(format!(" [{}] ", self.mode.to_uppercase()), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | model: "),
+                    Span::styled(self.model.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | tokens: "),
+                    Span::styled(self.tokens.to_string(), Style::default().fg(Color::White)),
+                    Span::raw(" | cost: "),
+                    Span::styled(cost_str, Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | "),
+                    Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_settings_toggle")),
+                    Span::styled("Ctrl+T", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_tree_toggle")),
+                    Span::styled("Ctrl+D", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_diff_toggle")),
+                    Span::styled("Ctrl+U", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_undo_toggle")),
+                    Span::styled("Ctrl+C", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_quit")),
+                ]
+            } else if width >= 80 {
+                // Compact responsive layout
+                vec![
+                    Span::styled(format!(" {} ", task_indicator), Style::default().fg(Color::Black).bg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+                    Span::raw(" "),
+                    Span::styled(format!(" [{}] ", self.mode.to_uppercase()), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | cost: "),
+                    Span::styled(cost_str, Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | "),
+                    Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_settings_toggle")),
+                    Span::styled("Ctrl+D", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_diff_toggle")),
+                    Span::styled("Ctrl+U", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_undo_toggle")),
+                ]
+            } else {
+                // Minimal responsive layout for narrow screens
+                vec![
+                    Span::styled(format!(" {} ", task_indicator), Style::default().fg(Color::Black).bg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+                    Span::raw(" "),
+                    Span::styled(format!(" [{}] ", self.mode.to_uppercase()), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
+                    Span::raw(" | "),
+                    Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::raw(tr(self.lang, "status_settings_toggle")),
+                    Span::styled("Ctrl+C", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+                ]
+            }
         };
 
         let status_bar = Paragraph::new(Line::from(spans))
