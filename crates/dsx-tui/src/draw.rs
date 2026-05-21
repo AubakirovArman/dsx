@@ -67,6 +67,8 @@ impl App {
             self.draw_settings(frame, main_workspace_area);
         } else if self.show_tools {
             self.draw_tools(frame, main_workspace_area);
+        } else if self.show_context {
+            self.draw_context(frame, main_workspace_area);
         } else {
             self.draw_workspace(frame, main_workspace_area);
         }

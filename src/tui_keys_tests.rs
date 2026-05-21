@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_keys::{active_scope_path, toggle_settings, toggle_tools};
+    use crate::tui_keys::{active_scope_path, toggle_context, toggle_settings, toggle_tools};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -44,5 +44,20 @@ mod tests {
 
         assert!(app.show_settings);
         assert!(!app.show_tools);
+    }
+
+    #[test]
+    fn context_toggle_hides_other_modal_views() {
+        let mut app = dsx_tui::App::new();
+        app.show_diff = true;
+        app.show_tools = true;
+        app.show_settings = true;
+
+        toggle_context(&mut app);
+
+        assert!(app.show_context);
+        assert!(!app.show_diff);
+        assert!(!app.show_tools);
+        assert!(!app.show_settings);
     }
 }
