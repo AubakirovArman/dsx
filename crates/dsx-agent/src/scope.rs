@@ -60,7 +60,7 @@ pub fn ensure_active_root(scope: &TaskScope) -> anyhow::Result<()> {
 }
 
 fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath> {
-    let allow_bare = has_scope_hint(task);
+    let allow_missing_bare = has_scope_hint(task);
     task.split_whitespace()
         .filter_map(|raw| {
             let cleaned = clean_path_token(raw);
@@ -74,10 +74,8 @@ fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath>
                 path
             } else if cleaned.contains('/') || cleaned.contains('\\') {
                 launch_root.join(path)
-            } else if allow_bare {
-                bare_child_candidate(launch_root, cleaned, task)?
             } else {
-                return None;
+                bare_child_candidate(launch_root, cleaned, task, allow_missing_bare)?
             };
             Some(ExplicitPath {
                 path,
@@ -87,12 +85,19 @@ fn explicit_path_candidates(launch_root: &Path, task: &str) -> Vec<ExplicitPath>
         .collect()
 }
 
-fn bare_child_candidate(launch_root: &Path, token: &str, task: &str) -> Option<PathBuf> {
+fn bare_child_candidate(
+    launch_root: &Path,
+    token: &str,
+    task: &str,
+    allow_missing: bool,
+) -> Option<PathBuf> {
     if !safe_bare_name(token) {
         return None;
     }
     let candidate = launch_root.join(token);
-    if candidate.is_dir() || (has_creation_hint(task) && plausible_missing_project_name(token)) {
+    if candidate.is_dir()
+        || (allow_missing && has_creation_hint(task) && plausible_missing_project_name(token))
+    {
         Some(candidate)
     } else {
         None

@@ -55,7 +55,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&target).unwrap();
         let app = Arc::new(Mutex::new(dsx_tui::App::new()));
-        app.lock().unwrap().input = "используй папку 1234 только".into();
+        app.lock().unwrap().input = "почини 1234".into();
 
         let prepared = prepare_task(&app, &root, "key").unwrap();
 

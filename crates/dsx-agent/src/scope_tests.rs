@@ -82,11 +82,25 @@ mod tests {
     }
 
     #[test]
-    fn does_not_narrow_bare_word_without_scope_hint() {
-        let root = temp_root("dsx_scope_no_hint");
+    fn narrows_existing_bare_child_even_without_scope_hint() {
+        let root = temp_root("dsx_scope_existing_bare");
         let target = root.join("1234");
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&target).unwrap();
+
+        let scope = resolve_task_scope(&root, "почини 1234").unwrap();
+
+        assert_eq!(scope.active_root, target.canonicalize().unwrap());
+        assert!(scope.narrowed);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn does_not_narrow_missing_bare_word_without_scope_hint() {
+        let root = temp_root("dsx_scope_missing_no_hint");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
 
         let scope = resolve_task_scope(&root, "почини 1234").unwrap();
 
