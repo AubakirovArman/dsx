@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::agent_preflight::build_agent_preflight;
+    use crate::agent_preflight::{build_agent_preflight, prepare_agent_start_scope, render_text};
 
     #[test]
     fn preflight_blocks_wide_container_workspace() {
@@ -20,6 +20,7 @@ mod tests {
                 .reason
                 .contains("Wide container workspace blocked")
         );
+        assert!(render_text(&preflight).contains("Decision: BLOCKED"));
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -54,6 +55,40 @@ mod tests {
             preflight.active,
             target.canonicalize().unwrap().display().to_string()
         );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prepare_agent_start_scope_returns_blocking_preflight_error() {
+        let root = temp_root("dsx_preflight_start_scope_block");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+
+        let result = prepare_agent_start_scope(&root, "доработай проект", false);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("agent preflight blocked")
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prepare_agent_start_scope_allows_policy_override() {
+        let root = temp_root("dsx_preflight_start_scope_allow");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("1234")).unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+
+        let scope = prepare_agent_start_scope(&root, "доработай проект", true).unwrap();
+
+        assert!(!scope.narrowed);
+        assert_eq!(scope.active_root, root.canonicalize().unwrap());
         let _ = std::fs::remove_dir_all(root);
     }
 

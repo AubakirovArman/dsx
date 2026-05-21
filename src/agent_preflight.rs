@@ -45,6 +45,19 @@ pub(crate) fn run_agent_preflight(
     Ok(())
 }
 
+pub(crate) fn prepare_agent_start_scope(
+    project_root: &Path,
+    task: &str,
+    allow_wide_scope: bool,
+) -> anyhow::Result<crate::task_scope::ResolvedTaskScope> {
+    let preflight = build_agent_preflight(project_root, task, allow_wide_scope);
+    if !preflight.allowed() {
+        print!("{}", render_text(&preflight));
+        anyhow::bail!("agent preflight blocked: {}", preflight.reason);
+    }
+    Ok(crate::task_scope::resolve_task_scope(project_root, task))
+}
+
 pub(crate) fn build_agent_preflight(
     project_root: &Path,
     task: &str,
@@ -71,7 +84,7 @@ pub(crate) fn build_agent_preflight(
     }
 }
 
-fn render_text(preflight: &AgentPreflight) -> String {
+pub(crate) fn render_text(preflight: &AgentPreflight) -> String {
     let scope = if preflight.narrowed {
         "NARROWED"
     } else {

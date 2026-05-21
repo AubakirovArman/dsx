@@ -10,7 +10,8 @@ pub async fn run_plan(
     mode: dsx_core::types::PermissionMode,
     allow_wide_scope: bool,
 ) -> anyhow::Result<()> {
-    let scope = prepare_cli_agent_scope(&project_root, task, allow_wide_scope)?;
+    let scope =
+        crate::agent_preflight::prepare_agent_start_scope(&project_root, task, allow_wide_scope)?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,
@@ -41,7 +42,8 @@ pub async fn run_edit(
     mode: dsx_core::types::PermissionMode,
     allow_wide_scope: bool,
 ) -> anyhow::Result<()> {
-    let scope = prepare_cli_agent_scope(&project_root, task, allow_wide_scope)?;
+    let scope =
+        crate::agent_preflight::prepare_agent_start_scope(&project_root, task, allow_wide_scope)?;
     let config = dsx_agent::AgentConfig {
         project_root,
         api_key,
@@ -183,20 +185,6 @@ pub fn run_scope_preview(project_root: &Path, task: &str) {
             "no"
         }
     );
-}
-
-pub(crate) fn prepare_cli_agent_scope(
-    project_root: &Path,
-    task: &str,
-    allow_wide_scope: bool,
-) -> anyhow::Result<crate::task_scope::ResolvedTaskScope> {
-    let scope = crate::task_scope::resolve_task_scope(project_root, task);
-    if let Some(message) =
-        crate::scope_guard::wide_scope_blocker(project_root, task, scope.narrowed, allow_wide_scope)
-    {
-        anyhow::bail!("{message}");
-    }
-    Ok(scope)
 }
 
 fn print_cli_scope(scope: &crate::task_scope::ResolvedTaskScope) {
