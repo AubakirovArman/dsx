@@ -118,7 +118,12 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
                 include_usage: true,
             }),
         };
-        crate::budget::check_request(&request)?;
+        let usage = crate::budget::RunUsage::new(
+            total_prompt_tokens,
+            total_completion_tokens,
+            total_reasoning_tokens,
+        );
+        crate::budget::check_request_with_usage(&request, usage)?;
 
         // Stream and collect events
         let events = client.chat_stream_events(&request).await?;
@@ -168,12 +173,13 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             total_prompt_tokens += u.prompt_tokens as u64;
             total_completion_tokens += u.completion_tokens as u64;
             if let Some(rt) = u.reasoning_tokens {
-                total_reasoning_tokens = rt as u64;
+                total_reasoning_tokens += rt as u64;
             }
             crate::budget::check_run_usage(
                 model_name,
                 total_prompt_tokens,
                 total_completion_tokens,
+                total_reasoning_tokens,
             )?;
         }
 

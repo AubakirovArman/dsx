@@ -36,6 +36,7 @@ pub struct App {
     pub lang: Language,
     pub api_base: String,
     pub api_key: String,
+    pub budget_status: String,
     pub task_brief: TaskBriefPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
 }
@@ -82,6 +83,7 @@ impl App {
             lang: initial_lang,
             api_base: "https://api.deepseek.com".to_string(),
             api_key: String::new(),
+            budget_status: String::new(),
             task_brief: TaskBriefPanel::default(),
             tool_timeline: Vec::new(),
         }

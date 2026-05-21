@@ -34,7 +34,10 @@ pub fn configure_initial_app(
     app.api_base = api_base;
     app.api_key = api_key;
     app.mode = initial_mode.as_str().to_string();
+    let budget_status = dsx_agent::budget::format_limits(dsx_agent::budget::current_limits());
+    app.budget_status = budget_status.clone();
     app.add_message("system", &format!("Project: {}", project_root.display()));
+    app.add_message("system", &format!("Budget fuse: {budget_status}"));
     app.add_message(
         "system",
         &format!(

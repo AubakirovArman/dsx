@@ -149,7 +149,8 @@ async fn run_streaming_internal(
                 include_usage: true,
             }),
         };
-        budget::check_request(&request)?;
+        let usage = budget::RunUsage::new(total_prompt, total_completion, total_reasoning);
+        budget::check_request_with_usage(&request, usage)?;
 
         // Use callback-based streaming — events go to TUI in real-time
         let tx_clone = tx.clone();
@@ -205,9 +206,9 @@ async fn run_streaming_internal(
             total_prompt += u.prompt_tokens as u64;
             total_completion += u.completion_tokens as u64;
             if let Some(rt) = u.reasoning_tokens {
-                total_reasoning = rt as u64;
+                total_reasoning += rt as u64;
             }
-            budget::check_run_usage(model_name, total_prompt, total_completion)?;
+            budget::check_run_usage(model_name, total_prompt, total_completion, total_reasoning)?;
         }
 
         messages.push(Message {

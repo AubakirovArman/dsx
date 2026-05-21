@@ -58,6 +58,8 @@ impl App {
                 plain_owned(self.tokens.to_string()),
                 plain(" | cost: "),
                 strong_owned(cost),
+                plain(" | fuse: "),
+                plain_owned(self.budget_status.clone()),
                 plain(" | "),
             ]);
             spans.extend(main_keys(self.lang, true));

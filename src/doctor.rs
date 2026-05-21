@@ -44,6 +44,7 @@ async fn collect_checks(project_root: &Path, api_base: &str, api_key: Option<&st
     let mut checks = Vec::new();
     checks.push(workspace_check(project_root));
     checks.push(api_check(api_base, api_key));
+    checks.push(budget_check());
     checks.push(git_check(project_root));
     checks.push(memory_check(project_root).await);
     checks.push(line_limit_check(project_root));
@@ -69,6 +70,17 @@ fn api_check(api_base: &str, api_key: Option<&str>) -> Check {
         return warn("api", format!("no key detected; local base={api_base}"));
     }
     warn("api", format!("no key detected for base={api_base}"))
+}
+
+fn budget_check() -> Check {
+    let limits = dsx_agent::budget::current_limits();
+    ok(
+        "budget",
+        format!(
+            "token/cost fuse: {}",
+            dsx_agent::budget::format_limits(limits)
+        ),
+    )
 }
 
 fn git_check(project_root: &Path) -> Check {
