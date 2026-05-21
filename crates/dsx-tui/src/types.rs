@@ -91,6 +91,12 @@ pub enum AgentStreamEvent {
         success: bool,
         summary: String,
     },
+    /// Older transcript messages were compacted before the next API call.
+    TranscriptCompact {
+        removed_messages: usize,
+        retained_messages: usize,
+        estimated_tokens_saved: usize,
+    },
     /// Task completed.
     Done {
         answer: String,

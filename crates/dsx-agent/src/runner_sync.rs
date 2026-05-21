@@ -154,7 +154,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
                         usage = u.clone();
                     }
                 }
-                StreamEvent::ToolResult { .. } => {}
+                StreamEvent::ToolResult { .. } | StreamEvent::TranscriptCompact { .. } => {}
                 StreamEvent::Error(err) => {
                     anyhow::bail!("Agent error: {err}");
                 }
@@ -224,7 +224,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             });
         }
         messages.extend(tool_msgs);
-        crate::transcript::compact_messages(&mut messages, &all_tool_results);
+        let _ = crate::transcript::compact_messages(&mut messages, &all_tool_results);
     }
 
     if final_answer.is_none() {

@@ -8,26 +8,42 @@ const SUMMARY_PREFIX: &str = "Rolling transcript summary:";
 const COMPACT_AFTER_MESSAGES: usize = 18;
 const RECENT_MESSAGE_WINDOW: usize = 8;
 
-pub fn compact_messages(messages: &mut Vec<Message>, tool_results: &[ToolResult]) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompactionStats {
+    pub removed_messages: usize,
+    pub retained_messages: usize,
+    pub estimated_tokens_saved: usize,
+}
+
+pub fn compact_messages(
+    messages: &mut Vec<Message>,
+    tool_results: &[ToolResult],
+) -> Option<CompactionStats> {
     if messages.len() <= COMPACT_AFTER_MESSAGES {
-        return false;
+        return None;
     }
-    let Some(user_index) = messages.iter().position(|msg| msg.role == "user") else {
-        return false;
-    };
+    let user_index = messages.iter().position(|msg| msg.role == "user")?;
 
     let tail_start = safe_tail_start(messages, user_index + 1);
     if tail_start <= user_index + 1 {
-        return false;
+        return None;
     }
 
     let removed_count = tail_start.saturating_sub(user_index + 1);
+    let removed_chars = messages[user_index + 1..tail_start]
+        .iter()
+        .map(message_chars)
+        .sum::<usize>();
     let mut compacted = base_prefix(messages, user_index);
     compacted.push(summary_message(removed_count, tool_results));
     compacted.push(messages[user_index].clone());
     compacted.extend_from_slice(&messages[tail_start..]);
     *messages = compacted;
-    true
+    Some(CompactionStats {
+        removed_messages: removed_count,
+        retained_messages: messages.len(),
+        estimated_tokens_saved: removed_chars / 4,
+    })
 }
 
 fn base_prefix(messages: &[Message], user_index: usize) -> Vec<Message> {
@@ -70,6 +86,16 @@ fn is_summary_message(message: &Message) -> bool {
             .is_some_and(|content| content.starts_with(SUMMARY_PREFIX))
 }
 
+fn message_chars(message: &Message) -> usize {
+    let content = message.content.as_deref().unwrap_or("");
+    let tool_args = message
+        .tool_calls
+        .as_ref()
+        .map(|calls| calls.iter().map(|call| call.function.arguments.len()).sum())
+        .unwrap_or(0);
+    content.chars().count() + tool_args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,8 +110,10 @@ mod tests {
         }
         let tools = vec![tool("read_file", true, "ok")];
 
-        assert!(compact_messages(&mut messages, &tools));
+        let stats = compact_messages(&mut messages, &tools).unwrap();
 
+        assert_eq!(stats.removed_messages, 16);
+        assert_eq!(stats.retained_messages, messages.len());
         assert_eq!(messages[0].role, "system");
         assert!(
             messages[1]
@@ -111,7 +139,7 @@ mod tests {
             messages.push(msg("tool", &format!("tool {i}")));
         }
 
-        compact_messages(&mut messages, &[]);
+        let _ = compact_messages(&mut messages, &[]);
         let user_index = messages.iter().position(|msg| msg.role == "user").unwrap();
 
         assert_ne!(messages[user_index + 1].role, "tool");

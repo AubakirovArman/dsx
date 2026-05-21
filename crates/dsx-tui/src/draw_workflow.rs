@@ -74,6 +74,20 @@ impl App {
 
     fn draw_tool_timeline_panel(&self, frame: &mut Frame, area: Rect) {
         let mut lines = Vec::new();
+        if self.compaction_events > 0 {
+            lines.push(Line::from(vec![
+                Span::styled("compact ", Style::default().fg(Color::LightCyan)),
+                Span::styled(
+                    format!(
+                        "{} event(s), {} msg, ~{} tok saved",
+                        self.compaction_events,
+                        self.compacted_messages,
+                        self.estimated_tokens_saved
+                    ),
+                    Style::default().fg(Color::Gray),
+                ),
+            ]));
+        }
         if self.tool_timeline.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "No tool calls in this task yet.",

@@ -1,5 +1,7 @@
 //! DSX TUI — ratatui-based interactive terminal workspace.
 
+#[cfg(test)]
+mod app_tests;
 pub mod draw;
 pub mod draw_chat;
 pub mod draw_input;
@@ -40,6 +42,9 @@ pub struct App {
     pub active_run_id: Option<u64>,
     pub next_run_id: u64,
     pub agent_abort: Option<tokio::task::AbortHandle>,
+    pub compaction_events: u64,
+    pub compacted_messages: u64,
+    pub estimated_tokens_saved: u64,
     pub task_brief: TaskBriefPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
 }
@@ -90,6 +95,9 @@ impl App {
             active_run_id: None,
             next_run_id: 0,
             agent_abort: None,
+            compaction_events: 0,
+            compacted_messages: 0,
+            estimated_tokens_saved: 0,
             task_brief: TaskBriefPanel::default(),
             tool_timeline: Vec::new(),
         }
@@ -133,6 +141,20 @@ impl App {
                 self.push_tool_event(name, *success, &short);
                 self.add_message("tool", &format!("{status} {name} — {short}"));
             }
+            AgentStreamEvent::TranscriptCompact {
+                removed_messages,
+                retained_messages,
+                estimated_tokens_saved,
+            } => {
+                self.compaction_events += 1;
+                self.compacted_messages += *removed_messages as u64;
+                self.estimated_tokens_saved += *estimated_tokens_saved as u64;
+                let summary = format!(
+                    "{removed_messages} msg compacted, ~{estimated_tokens_saved} tok saved, {retained_messages} retained"
+                );
+                self.push_tool_event("context_compact", true, &summary);
+                self.add_message("system", &format!("Context compacted: {summary}"));
+            }
             AgentStreamEvent::Done {
                 answer: _ans,
                 iterations,
@@ -170,6 +192,9 @@ impl App {
             active_scope: active_scope.into(),
         };
         self.tool_timeline.clear();
+        self.compaction_events = 0;
+        self.compacted_messages = 0;
+        self.estimated_tokens_saved = 0;
     }
 
     pub fn add_message(&mut self, role: &str, content: &str) {

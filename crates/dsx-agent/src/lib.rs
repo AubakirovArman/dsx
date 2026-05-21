@@ -192,7 +192,7 @@ async fn run_streaming_internal(
                 StreamEvent::Error(err) => {
                     anyhow::bail!("Agent error: {err}");
                 }
-                StreamEvent::ToolResult { .. } => {}
+                StreamEvent::ToolResult { .. } | StreamEvent::TranscriptCompact { .. } => {}
                 StreamEvent::Done { .. } => {}
             }
         }
@@ -262,7 +262,13 @@ async fn run_streaming_internal(
             break;
         }
         messages.extend(tool_msgs);
-        transcript::compact_messages(&mut messages, &all_tool_results);
+        if let Some(stats) = transcript::compact_messages(&mut messages, &all_tool_results) {
+            let _ = tx.send(StreamEvent::TranscriptCompact {
+                removed_messages: stats.removed_messages,
+                retained_messages: stats.retained_messages,
+                estimated_tokens_saved: stats.estimated_tokens_saved,
+            });
+        }
     }
 
     if final_answer.is_none() {

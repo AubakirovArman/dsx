@@ -24,6 +24,15 @@ pub fn convert_event(ev: &dsx_provider::streaming::StreamEvent) -> dsx_tui::Agen
             success: *success,
             summary: summary.clone(),
         },
+        dsx_provider::streaming::StreamEvent::TranscriptCompact {
+            removed_messages,
+            retained_messages,
+            estimated_tokens_saved,
+        } => dsx_tui::AgentStreamEvent::TranscriptCompact {
+            removed_messages: *removed_messages,
+            retained_messages: *retained_messages,
+            estimated_tokens_saved: *estimated_tokens_saved,
+        },
         dsx_provider::streaming::StreamEvent::Finish { .. } => {
             dsx_tui::AgentStreamEvent::Reasoning(String::new())
         }
