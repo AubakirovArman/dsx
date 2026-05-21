@@ -1,6 +1,7 @@
 //! DSX Code — terminal coding agent entrypoint.
 
 pub mod cli;
+pub mod context_preview;
 pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
@@ -30,6 +31,7 @@ pub mod workspace_stale_runs;
 
 use clap::Parser;
 use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
+use context_preview::run_context_preview;
 use handlers::{
     list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
     run_mcp_list, run_plan, run_scope_preview, task_preview,
@@ -90,6 +92,10 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::Scope { task }) => {
             let desc = task.join(" ");
             run_scope_preview(&project_root, &desc);
+        }
+        Some(Command::Context { task, json }) => {
+            let desc = task.join(" ");
+            run_context_preview(&project_root, &desc, json).await?;
         }
         Some(Command::Index { action }) => run_index_action(&project_root, action).await?,
         Some(Command::Mcp { action }) => run_mcp_action(action).await?,

@@ -57,6 +57,15 @@ pub enum Command {
         #[arg(required = true)]
         task: Vec<String>,
     },
+    /// Preview the compact model context for a task without calling the model
+    Context {
+        /// Task text to resolve and assemble context for
+        #[arg(required = true)]
+        task: Vec<String>,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Build or query the local code index
     Index {
         #[command(subcommand)]
