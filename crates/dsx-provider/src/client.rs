@@ -87,14 +87,14 @@ impl DeepSeekClient {
 
         while attempts < max_attempts {
             attempts += 1;
-            match self.client
+            let send_fut = self.client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(&req)
-                .send()
-                .await
-            {
-                Ok(resp) => {
+                .send();
+
+            match tokio::time::timeout(std::time::Duration::from_secs(20), send_fut).await {
+                Ok(Ok(resp)) => {
                     let status = resp.status();
                     if status.is_success() {
                         match parse_sse_stream(resp).await {
@@ -109,8 +109,11 @@ impl DeepSeekClient {
                         last_err = anyhow::anyhow!("API error {}: {}", status_code, body);
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     last_err = e.into();
+                }
+                Err(_) => {
+                    last_err = anyhow::anyhow!("Connection timed out (no response headers received within 20s)");
                 }
             }
 
@@ -139,14 +142,14 @@ impl DeepSeekClient {
 
         while attempts < max_attempts {
             attempts += 1;
-            match self.client
+            let send_fut = self.client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(&req)
-                .send()
-                .await
-            {
-                Ok(resp) => {
+                .send();
+
+            match tokio::time::timeout(std::time::Duration::from_secs(20), send_fut).await {
+                Ok(Ok(resp)) => {
                     let status = resp.status();
                     if status.is_success() {
                         match parse_sse_stream_callback(resp, &mut on_event).await {
@@ -161,15 +164,18 @@ impl DeepSeekClient {
                         last_err = anyhow::anyhow!("API error {}: {}", status_code, body);
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     last_err = e.into();
+                }
+                Err(_) => {
+                    last_err = anyhow::anyhow!("Connection timed out (no response headers received within 20s)");
                 }
             }
 
             if attempts < max_attempts {
                 let msg = match attempts {
-                    1 => "⚠️ [Сетевой сбой. Переподключение к API через 1 секунду...]\n",
-                    2 => "⚠️ [Сервер перегружен. Вторая попытка переподключения через 2 секунды...]\n",
+                    1 => "⚠️ [Сервер перегружен / Очередь промпта превысила 20с. Переподключение...]\n",
+                    2 => "⚠️ [Таймаут первого байта. Вторая попытка переподключения через 2 секунды...]\n",
                     _ => "⚠️ [Задержка сети. Финальная попытка подключения через 3 секунды...]\n",
                 };
                 on_event(StreamEvent::Reasoning(msg.to_string()));
