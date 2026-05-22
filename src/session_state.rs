@@ -55,8 +55,12 @@ pub async fn record_task_finished(
     summary.last_changes = latest_tool_summary(brief, tools);
     summary.next_step = brief.next_step.clone();
     summary.active_scope = brief.active_scope.clone();
-    summary.constraints = default_constraints();
-    summary.architecture = architecture_outline(active_root);
+    summary.constraints = non_empty(&brief.constraints)
+        .map(str::to_string)
+        .unwrap_or_else(default_constraints);
+    summary.architecture = non_empty(&brief.architecture)
+        .map(str::to_string)
+        .unwrap_or_else(|| architecture_outline(active_root));
     summary.scope_violations = scope_violations;
     summary.last_scope_violation = last_scope_violation.to_string();
     summary.updated_at.clear();

@@ -152,6 +152,8 @@ impl App {
             last_changes: "No tool result yet.".into(),
             next_step: "Waiting for first model/tool event.".into(),
             active_scope: active_scope.into(),
+            constraints: "Active scope is a hard boundary; keep source files <= 300 lines.".into(),
+            architecture: "Architecture will be refreshed during context preflight.".into(),
         };
         let status = if narrowed { "Narrowed" } else { "Wide" };
         self.scope_lock = ScopeLockPanel {

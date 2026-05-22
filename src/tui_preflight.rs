@@ -17,6 +17,8 @@ pub(crate) fn block_if_needed(app: &mut dsx_tui::App, project_root: &Path, task:
         last_changes: preflight.reason.clone(),
         next_step: blocked_next_step(&preflight),
         active_scope: preflight.active.clone(),
+        constraints: "No model call or tool execution before a safe active scope is chosen.".into(),
+        architecture: "Blocked before active-scope architecture collection.".into(),
     };
     app.scope_lock = dsx_tui::ScopeLockPanel {
         launch_scope: preflight.launch,

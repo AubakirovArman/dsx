@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::session_state::load_folder_notes;
+    use crate::session_state::{load_folder_notes, record_task_finished};
 
     #[tokio::test]
     async fn folder_notes_include_child_task_summary_and_fallbacks() {
@@ -57,6 +57,37 @@ mod tests {
 
         assert!(scoped_note.summary.contains("Scope guard blocked 2"));
         assert!(scoped_note.summary.contains("grep"));
+
+        pool.close().await;
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn finished_task_persists_capsule_constraints_and_architecture() {
+        let root = temp_root("dsx_task_finished_capsule");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let brief = dsx_tui::TaskBriefPanel {
+            goal: "build".into(),
+            constraints: "keep files <= 300 lines".into(),
+            architecture: "- src/: app code".into(),
+            active_scope: root.display().to_string(),
+            ..Default::default()
+        };
+
+        record_task_finished(&root, &brief, &[], 0, "")
+            .await
+            .unwrap();
+        let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
+            .await
+            .unwrap();
+        let summary = dsx_memory::load_task_summary(&pool, &root.display().to_string())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(summary.constraints, "keep files <= 300 lines");
+        assert_eq!(summary.architecture, "- src/: app code");
 
         pool.close().await;
         let _ = std::fs::remove_dir_all(root);

@@ -48,6 +48,8 @@ pub struct TaskBriefPanel {
     pub last_changes: String,
     pub next_step: String,
     pub active_scope: String,
+    pub constraints: String,
+    pub architecture: String,
 }
 
 impl Default for TaskBriefPanel {
@@ -59,6 +61,8 @@ impl Default for TaskBriefPanel {
             last_changes: "No changes in this run.".into(),
             next_step: "Type a task and press Enter.".into(),
             active_scope: String::new(),
+            constraints: "Active scope is a hard boundary; keep files <= 300 lines.".into(),
+            architecture: "No active-scope architecture loaded yet.".into(),
         }
     }
 }

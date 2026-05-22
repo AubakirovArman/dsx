@@ -39,6 +39,8 @@ pub(crate) fn mark_ready(app: &SharedApp, preview: &ContextPreview) {
         last_changes: format!("{}\n{}", line, preview.task_parts.last_changes),
         next_step: preview.task_parts.next_step.clone(),
         active_scope: preview.task_parts.active_scope.clone(),
+        constraints: preview.task_parts.constraints.clone(),
+        architecture: preview.task_parts.surface_architecture.clone(),
     };
     app.add_message("system", &format!("Context budget preflight: {line}"));
 }

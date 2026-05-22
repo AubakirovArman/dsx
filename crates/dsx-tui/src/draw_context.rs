@@ -45,6 +45,14 @@ fn append_brief(brief: &TaskBriefPanel, lines: &mut Vec<Line<'static>>) {
     push_field(lines, "Plan", &brief.plan, Color::White, 5);
     push_field(lines, "Last", &brief.last_changes, Color::Yellow, 3);
     push_field(lines, "Next", &brief.next_step, Color::LightMagenta, 2);
+    push_field(lines, "Constraints", &brief.constraints, Color::LightRed, 5);
+    push_field(
+        lines,
+        "Architecture",
+        &brief.architecture,
+        Color::LightBlue,
+        8,
+    );
 }
 
 fn append_scope(app: &App, lines: &mut Vec<Line<'static>>) {

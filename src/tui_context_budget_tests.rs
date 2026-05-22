@@ -32,6 +32,8 @@ mod tests {
         assert!(app.task_brief.last_changes.contains("capsule request"));
         assert!(app.task_brief.next_step.contains("Start scoped inspection"));
         assert_eq!(app.task_brief.active_scope, expected_scope);
+        assert!(app.task_brief.constraints.contains("300 lines"));
+        assert!(app.task_brief.architecture.contains("src/"));
         assert!(
             app.messages
                 .iter()
