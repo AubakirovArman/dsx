@@ -1,5 +1,6 @@
 //! Agent run ledger for cost, status, and compaction audit trails.
 
+use crate::run_ledger_row::AgentRunRow;
 use chrono::Utc;
 use sqlx::SqlitePool;
 
@@ -232,63 +233,6 @@ fn excerpt(value: &str, limit: usize) -> String {
 
 fn to_i64(value: u64) -> i64 {
     value.min(i64::MAX as u64) as i64
-}
-
-#[derive(sqlx::FromRow)]
-struct AgentRunRow {
-    id: String,
-    session_id: Option<String>,
-    project_root: String,
-    task_excerpt: String,
-    status: String,
-    started_at: String,
-    finished_at: Option<String>,
-    prompt_tokens: i64,
-    completion_tokens: i64,
-    reasoning_tokens: i64,
-    total_tokens: i64,
-    estimated_cost_usd: f64,
-    compaction_events: i64,
-    compacted_messages: i64,
-    estimated_tokens_saved: i64,
-    launch_scope: String,
-    active_scope: String,
-    scope_status: String,
-    scope_reason: String,
-    scope_violations: i64,
-    last_scope_violation: String,
-    error: Option<String>,
-    cancelled: i64,
-}
-
-impl From<AgentRunRow> for AgentRunRecord {
-    fn from(row: AgentRunRow) -> Self {
-        Self {
-            id: row.id,
-            session_id: row.session_id,
-            project_root: row.project_root,
-            task_excerpt: row.task_excerpt,
-            status: row.status,
-            started_at: row.started_at,
-            finished_at: row.finished_at,
-            prompt_tokens: row.prompt_tokens,
-            completion_tokens: row.completion_tokens,
-            reasoning_tokens: row.reasoning_tokens,
-            total_tokens: row.total_tokens,
-            estimated_cost_usd: row.estimated_cost_usd,
-            compaction_events: row.compaction_events,
-            compacted_messages: row.compacted_messages,
-            estimated_tokens_saved: row.estimated_tokens_saved,
-            launch_scope: row.launch_scope,
-            active_scope: row.active_scope,
-            scope_status: row.scope_status,
-            scope_reason: row.scope_reason,
-            scope_violations: row.scope_violations,
-            last_scope_violation: row.last_scope_violation,
-            error: row.error,
-            cancelled: row.cancelled != 0,
-        }
-    }
 }
 
 #[cfg(test)]

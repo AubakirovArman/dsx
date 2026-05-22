@@ -9,6 +9,7 @@ use std::path::Path;
 
 mod migrations;
 pub mod run_ledger;
+mod run_ledger_row;
 pub mod task_summary;
 
 pub use run_ledger::{
