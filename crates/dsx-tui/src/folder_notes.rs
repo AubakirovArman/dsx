@@ -92,11 +92,12 @@ impl App {
             );
             return false;
         };
-        self.input = if label == "." {
-            "use current workspace only: ".into()
+        let prefix = if label == "." {
+            "use current workspace only:".to_string()
         } else {
-            format!("use folder {label} only: ")
+            format!("use folder {label} only:")
         };
+        self.input = scoped_task_input(&prefix, &self.input);
         self.cursor_pos = self.input.chars().count();
         self.show_context = false;
         self.add_message(
@@ -134,6 +135,30 @@ fn folder_architecture(folder: &str) -> String {
         _ => "active project folder; load detailed context only when needed",
     }
     .into()
+}
+
+fn scoped_task_input(prefix: &str, current: &str) -> String {
+    let body = task_body_without_scope_prefix(current);
+    if body.is_empty() {
+        format!("{prefix} ")
+    } else {
+        format!("{prefix} {body}")
+    }
+}
+
+fn task_body_without_scope_prefix(current: &str) -> &str {
+    let trimmed = current.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("use current workspace only:") {
+        return trimmed["use current workspace only:".len()..].trim_start();
+    }
+    if let Some(rest) = lower.strip_prefix("use folder ")
+        && let Some(index) = rest.find(" only:")
+    {
+        let body_start = "use folder ".len() + index + " only:".len();
+        return trimmed[body_start..].trim_start();
+    }
+    trimmed
 }
 
 fn safe_relative_path(label: &str) -> Option<&Path> {

@@ -166,11 +166,18 @@ mod tests {
         app.show_context = true;
         app.scope_lock.launch_scope = "/tmp/sites".into();
         app.upsert_folder_note("/tmp/sites/1234", "state", "next");
+        app.input = "polish UI".into();
 
         assert!(app.draft_focused_scope_task());
-        assert_eq!(app.input, "use folder 1234 only: ");
+        assert_eq!(app.input, "use folder 1234 only: polish UI");
         assert_eq!(app.cursor_pos, app.input.chars().count());
         assert!(!app.show_context);
+
+        app.show_context = true;
+        app.input = "use folder old only: polish UI".into();
+
+        assert!(app.draft_focused_scope_task());
+        assert_eq!(app.input, "use folder 1234 only: polish UI");
 
         app.show_context = true;
         app.input = "keep".into();
