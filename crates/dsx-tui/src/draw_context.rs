@@ -15,6 +15,7 @@ impl App {
         append_brief(&self.task_brief, &mut lines);
         lines.push(Line::from(""));
         append_scope(self, &mut lines);
+        append_handoff(self, &mut lines);
         lines.push(Line::from(""));
         append_folder_notes(self, &mut lines);
         lines.push(Line::from(""));
@@ -67,6 +68,17 @@ fn append_scope(app: &App, lines: &mut Vec<Line<'static>>) {
     if !app.scope_lock.warning.trim().is_empty() {
         push_inline(lines, "Check", &app.scope_lock.warning, Color::LightYellow);
     }
+}
+
+fn append_handoff(app: &App, lines: &mut Vec<Line<'static>>) {
+    let color = if app.scope_violations > 0 {
+        Color::LightRed
+    } else if handoff_ready(app) {
+        Color::LightGreen
+    } else {
+        Color::Gray
+    };
+    push_inline(lines, "Handoff", &handoff_status_text(app), color);
 }
 
 fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
@@ -166,6 +178,38 @@ fn append_compaction(app: &App, lines: &mut Vec<Line<'static>>) {
     push_inline(lines, "Compaction", &status, Color::LightCyan);
 }
 
+fn handoff_status_text(app: &App) -> String {
+    let state = if app.scope_violations > 0 {
+        "blocked"
+    } else if handoff_ready(app) {
+        "ready"
+    } else {
+        "idle"
+    };
+    format!(
+        "{state}; scope {}; notes {}; tools {}; compact {}/~{}tok",
+        safe_scope(&app.scope_lock.active_scope),
+        app.folder_notes.len(),
+        app.tool_timeline.len(),
+        app.compaction_events,
+        app.estimated_tokens_saved
+    )
+}
+
+fn handoff_ready(app: &App) -> bool {
+    !app.task_brief.goal.trim().is_empty()
+        && app.task_brief.goal != "No active task."
+        && !app.scope_lock.active_scope.trim().is_empty()
+}
+
+fn safe_scope(scope: &str) -> &str {
+    if scope.trim().is_empty() {
+        "(none)"
+    } else {
+        scope
+    }
+}
+
 fn push_field(
     lines: &mut Vec<Line<'static>>,
     label: &'static str,
@@ -207,5 +251,45 @@ fn scope_color(app: &App) -> Color {
         Color::LightGreen
     } else {
         Color::LightYellow
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{FolderNote, ToolTimelineEntry};
+
+    #[test]
+    fn handoff_status_summarizes_context_readiness() {
+        let mut app = App::new();
+
+        assert!(handoff_status_text(&app).starts_with("idle;"));
+
+        app.begin_task_scoped("build 1234", "/tmp/sites", "/tmp/sites/1234", true);
+        app.folder_notes.clear();
+        app.folder_notes.push(FolderNote {
+            folder: "1234/".into(),
+            summary: "state".into(),
+            next_step: "next".into(),
+            architecture: "arch".into(),
+        });
+        app.tool_timeline.push(ToolTimelineEntry {
+            name: "read_file".into(),
+            status: "ok".into(),
+            summary: "inspected".into(),
+        });
+        app.compaction_events = 1;
+        app.estimated_tokens_saved = 340;
+
+        let status = handoff_status_text(&app);
+
+        assert!(status.starts_with("ready;"));
+        assert!(status.contains("scope /tmp/sites/1234"));
+        assert!(status.contains("notes 1"));
+        assert!(status.contains("tools 1"));
+        assert!(status.contains("compact 1/~340tok"));
+
+        app.scope_violations = 1;
+        assert!(handoff_status_text(&app).starts_with("blocked;"));
     }
 }
