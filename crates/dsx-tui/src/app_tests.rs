@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::{AgentStreamEvent, App};
+    use crate::{AgentStreamEvent, App, FolderNote};
 
     #[test]
     fn transcript_compaction_updates_visible_telemetry() {
@@ -146,5 +146,26 @@ mod tests {
         let note = app.focused_folder_note().unwrap();
         assert_eq!(note.folder, "one/");
         assert_eq!(note.summary, "updated");
+    }
+
+    #[test]
+    fn focused_folder_scope_resolves_inside_launch_scope() {
+        let mut app = App::new();
+        app.scope_lock.launch_scope = "/tmp/sites".into();
+        app.upsert_folder_note("/tmp/sites/1234", "state", "next");
+
+        assert_eq!(app.focused_folder_scope().unwrap(), "/tmp/sites/1234");
+
+        app.set_folder_notes(vec![note("../outside/")]);
+        assert!(app.focused_folder_scope().is_none());
+    }
+
+    fn note(folder: &str) -> FolderNote {
+        FolderNote {
+            folder: folder.into(),
+            summary: "state".into(),
+            next_step: "next".into(),
+            architecture: "arch".into(),
+        }
     }
 }

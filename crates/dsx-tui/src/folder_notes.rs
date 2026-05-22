@@ -1,7 +1,7 @@
 //! Compact per-folder note helpers for the workflow panel.
 
 use crate::{App, FolderNote};
-use std::path::Path;
+use std::path::{Component, Path};
 
 impl App {
     pub fn set_folder_notes(&mut self, notes: Vec<FolderNote>) {
@@ -68,6 +68,18 @@ impl App {
             .and_then(|index| self.folder_notes.get(index))
     }
 
+    pub fn focused_folder_scope(&self) -> Option<String> {
+        let note = self.focused_folder_note()?;
+        let launch = non_empty(&self.scope_lock.launch_scope)
+            .or_else(|| non_empty(&self.scope_lock.active_scope))?;
+        let label = note.folder.trim().trim_end_matches('/');
+        if label == "." {
+            return Some(launch.to_string());
+        }
+        let relative = safe_relative_path(label)?;
+        Some(Path::new(launch).join(relative).display().to_string())
+    }
+
     fn clamp_folder_note_cursor(&mut self) {
         if self.folder_notes.is_empty() {
             self.folder_note_cursor = 0;
@@ -96,4 +108,19 @@ fn folder_architecture(folder: &str) -> String {
         _ => "active project folder; load detailed context only when needed",
     }
     .into()
+}
+
+fn safe_relative_path(label: &str) -> Option<&Path> {
+    let path = Path::new(label);
+    if path.as_os_str().is_empty() || path.is_absolute() {
+        return None;
+    }
+    path.components()
+        .all(|part| matches!(part, Component::Normal(_)))
+        .then_some(path)
+}
+
+fn non_empty(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
 }

@@ -121,6 +121,9 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
     if let Some(note) = app.focused_folder_note() {
         lines.push(Line::from(""));
         push_inline(lines, "Focused", &note.folder, Color::LightCyan);
+        if let Some(scope) = app.focused_folder_scope() {
+            push_inline(lines, "Focused path", &scope, Color::Gray);
+        }
         push_field(
             lines,
             "Focused next",
