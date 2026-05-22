@@ -23,6 +23,10 @@ impl App {
                 Span::styled("Scope guard: ", Style::default().fg(scope_color(self))),
                 Span::styled(scope_guard_text(self), Style::default().fg(Color::White)),
             ]),
+            Line::from(vec![
+                Span::styled("Tool totals: ", Style::default().fg(Color::LightYellow)),
+                Span::styled(tool_totals_text(self), Style::default().fg(Color::White)),
+            ]),
             Line::from(""),
         ];
         if self.compaction_events > 0 {
@@ -119,10 +123,55 @@ fn scope_guard_text(app: &App) -> String {
     )
 }
 
+fn tool_totals_text(app: &App) -> String {
+    let (ok, failed, blocked) = tool_counts(app);
+    format!("ok {ok} / failed {failed} / blocked {blocked}")
+}
+
+fn tool_counts(app: &App) -> (usize, usize, usize) {
+    let ok = app
+        .tool_timeline
+        .iter()
+        .filter(|entry| entry.status == "ok")
+        .count();
+    let failed = app
+        .tool_timeline
+        .iter()
+        .filter(|entry| entry.status == "failed")
+        .count();
+    let blocked = app
+        .tool_timeline
+        .iter()
+        .filter(|entry| entry.status == "blocked")
+        .count();
+    (ok, failed, blocked)
+}
+
 fn scope_text(scope: &str) -> &str {
     if scope.trim().is_empty() {
         "(none)"
     } else {
         scope
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ToolTimelineEntry;
+
+    #[test]
+    fn tool_totals_count_visible_statuses() {
+        let mut app = App::new();
+        for status in ["ok", "failed", "blocked", "ok"] {
+            app.tool_timeline.push(ToolTimelineEntry {
+                name: "tool".into(),
+                status: status.into(),
+                summary: "summary".into(),
+            });
+        }
+
+        assert_eq!(tool_counts(&app), (2, 1, 1));
+        assert_eq!(tool_totals_text(&app), "ok 2 / failed 1 / blocked 1");
     }
 }
