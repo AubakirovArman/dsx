@@ -72,6 +72,7 @@ pub struct App {
     pub run_ledger: RunLedgerPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
     pub allow_wide_scope: bool,
+    pub project_root: std::path::PathBuf,
 }
 
 impl App {
@@ -139,6 +140,7 @@ impl App {
             run_ledger: RunLedgerPanel::default(),
             tool_timeline: Vec::new(),
             allow_wide_scope: false,
+            project_root: std::path::PathBuf::from("."),
         }
     }
 

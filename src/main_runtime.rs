@@ -62,23 +62,32 @@ pub(crate) fn api_key_file(project_root: &std::path::Path) -> Option<String> {
     None
 }
 
-pub async fn create_session(
+pub async fn load_or_create_session(
     project_root: &std::path::Path,
     mode: dsx_core::types::PermissionMode,
-) -> (Option<sqlx::SqlitePool>, Option<String>) {
+) -> (Option<sqlx::SqlitePool>, Option<String>, std::path::PathBuf) {
     let db_path = project_root.join(".dsx").join("sessions.db");
     match dsx_memory::open(&db_path).await {
         Ok(pool) => {
             let sm = dsx_session::SessionManager::new(pool.clone());
+            // Try to load the latest session automatically
+            if let Ok(sessions) = sm.list(1).await {
+                if !sessions.is_empty() {
+                    let latest = &sessions[0];
+                    let loaded_path = std::path::PathBuf::from(&latest.project_root);
+                    return (Some(pool), Some(latest.id.clone()), loaded_path);
+                }
+            }
+            // Fallback to creating a new one
             match sm
                 .create(&project_root.display().to_string(), mode.as_str())
                 .await
             {
-                Ok(session) => (Some(pool), Some(session.id)),
-                Err(_) => (Some(pool), None),
+                Ok(session) => (Some(pool), Some(session.id), project_root.to_path_buf()),
+                Err(_) => (Some(pool), None, project_root.to_path_buf()),
             }
         }
-        Err(_) => (None, None),
+        Err(_) => (None, None, project_root.to_path_buf()),
     }
 }
 

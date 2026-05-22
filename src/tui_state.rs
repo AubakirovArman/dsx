@@ -36,6 +36,7 @@ pub fn configure_initial_app(
     app.api_key = api_key;
     app.allow_wide_scope = allow_wide_scope;
     app.mode = initial_mode.as_str().to_string();
+    app.project_root = project_root.to_path_buf();
     let budget_limits = dsx_agent::budget::current_limits();
     let budget_status = dsx_agent::budget::format_limits(budget_limits);
     app.budget_status = budget_status.clone();

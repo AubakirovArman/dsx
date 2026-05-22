@@ -27,6 +27,15 @@ pub async fn start_agent_task(
     prepared.ledger_id = crate::tui_run_ledger::start_run_ledger(app, session_id, &prepared).await;
     persist_user_message(session_id, pool, rt, &prepared.task);
 
+    if let (Some(ref sid), Some(ref p)) = (session_id.clone(), pool.clone()) {
+        let sm = dsx_session::SessionManager::new(p.clone());
+        let sid_copy = sid.clone();
+        let path_str = prepared.active_root.display().to_string();
+        rt.spawn(async move {
+            let _ = sm.update_project_root(&sid_copy, &path_str).await;
+        });
+    }
+
     let api_base = app.lock().unwrap().api_base.clone();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let (approval_tx, mut approval_rx) = mpsc::unbounded_channel();
@@ -137,6 +146,10 @@ pub(crate) fn prepare_task(
         return None;
     }
     let scope = crate::task_scope::resolve_task_scope(project_root, &task);
+    app.project_root = scope.active_root.clone();
+    if let Ok(files) = dsx_fs::list_files(&app.project_root) {
+        app.file_tree = files.into_iter().take(50).collect();
+    }
     app.input.clear();
     app.scroll_offset = 0;
     let mode = dsx_core::types::PermissionMode::parse(&app.mode)

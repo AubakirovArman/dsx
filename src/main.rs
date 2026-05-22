@@ -73,7 +73,7 @@ use context_capsule::run_context_capsule;
 use context_preview::run_context_preview;
 use handlers::{run_edit, run_eval, run_plan, run_scope_preview, task_preview};
 use main_runtime::{
-    api_key, create_session, initial_mode, load_config_or_default, require_api_key,
+    api_key, load_or_create_session, initial_mode, load_config_or_default, require_api_key,
     run_index_action, run_mcp_action, run_workspace_action,
 };
 
@@ -93,9 +93,9 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         None | Some(Command::Interactive) => {
-            let (pool, session_id) = create_session(&project_root, mode).await;
+            let (pool, session_id, loaded_path) = load_or_create_session(&project_root, mode).await;
             tui_runner::run_tui(
-                project_root,
+                loaded_path,
                 api_key.unwrap_or_default(),
                 api_base,
                 mode,

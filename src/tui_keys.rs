@@ -17,7 +17,7 @@ pub enum KeyOutcome {
 pub async fn handle_key(
     key: KeyEvent,
     app: &SharedApp,
-    project_root: &Path,
+    _project_root: &Path,
     api_key: &str,
     session_id: &Option<String>,
     pool: &Option<sqlx::SqlitePool>,
@@ -27,6 +27,11 @@ pub async fn handle_key(
         return Ok(outcome);
     }
 
+    let active_root = {
+        let a = app.lock().unwrap();
+        a.project_root.clone()
+    };
+
     match key.code {
         KeyCode::Char('c') if ctrl(key) => Ok(KeyOutcome::Quit),
         KeyCode::Char('k') if ctrl(key) => {
@@ -34,7 +39,7 @@ pub async fn handle_key(
             Ok(KeyOutcome::Continue)
         }
         KeyCode::Enter => {
-            crate::tui_task::start_agent_task(app, project_root, api_key, session_id, pool, rt)
+            crate::tui_task::start_agent_task(app, &active_root, api_key, session_id, pool, rt)
                 .await?;
             Ok(KeyOutcome::Continue)
         }
@@ -42,9 +47,9 @@ pub async fn handle_key(
         KeyCode::Char('s') if ctrl(key) => toggle(app, toggle_settings),
         KeyCode::Char('b') if ctrl(key) => toggle(app, toggle_context),
         KeyCode::Char('m') if ctrl(key) => toggle(app, toggle_mission),
-        KeyCode::Char('d') if ctrl(key) => toggle_diff(app, project_root),
+        KeyCode::Char('d') if ctrl(key) => toggle_diff(app, &active_root),
         KeyCode::Char('l') if ctrl(key) => toggle(app, toggle_tools),
-        KeyCode::Char('u') if ctrl(key) => rollback(app, project_root),
+        KeyCode::Char('u') if ctrl(key) => rollback(app, &active_root),
         KeyCode::Up => scroll(app, 1),
         KeyCode::Down => scroll(app, -1),
         KeyCode::PageUp => scroll(app, 10),
