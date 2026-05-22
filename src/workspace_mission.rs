@@ -41,12 +41,33 @@ pub(crate) struct MissionNote {
     pub(crate) architecture: String,
 }
 
-pub async fn run_workspace_mission(project_root: &Path, limit: u32, all: bool, json: bool) {
+pub async fn run_workspace_mission(
+    project_root: &Path,
+    limit: u32,
+    all: bool,
+    json: bool,
+    check: bool,
+) -> anyhow::Result<()> {
     match collect_mission_snapshot(project_root, limit, all).await {
-        Ok(snapshot) if json => println!("{}", mission_json(&snapshot)),
-        Ok(snapshot) => crate::workspace_mission_output::print_mission(&snapshot, all),
-        Err(e) => println!("Workspace mission error: {e}"),
+        Ok(snapshot) => {
+            if json {
+                println!("{}", mission_json(&snapshot));
+            } else {
+                crate::workspace_mission_output::print_mission(&snapshot, all);
+            }
+            let failures = mission_check_failures(&snapshot);
+            if check && !failures.is_empty() {
+                anyhow::bail!("workspace mission check failed: {}", failures.join("; "));
+            }
+        }
+        Err(e) => {
+            println!("Workspace mission error: {e}");
+            if check {
+                anyhow::bail!("workspace mission check failed: {e}");
+            }
+        }
     }
+    Ok(())
 }
 
 pub(crate) async fn collect_mission_snapshot(
@@ -102,6 +123,32 @@ fn mission_run_health(runs: &[crate::workspace_runs::LocatedRun]) -> MissionRunH
         health.scope_violations += run.scope_violations;
     }
     health
+}
+
+pub(crate) fn mission_check_failures(snapshot: &MissionSnapshot) -> Vec<String> {
+    let mut failures = Vec::new();
+    if !snapshot.line_limit.ok {
+        failures.push("line-limit violations present".into());
+    }
+    if snapshot.run_health.running_runs > 0 {
+        failures.push(format!(
+            "{} running run(s) still open",
+            snapshot.run_health.running_runs
+        ));
+    }
+    if snapshot.run_health.failed_runs > 0 {
+        failures.push(format!(
+            "{} failed run(s) in recent history",
+            snapshot.run_health.failed_runs
+        ));
+    }
+    if snapshot.run_health.scope_violations > 0 {
+        failures.push(format!(
+            "{} blocked scope escape(s)",
+            snapshot.run_health.scope_violations
+        ));
+    }
+    failures
 }
 
 fn mission_line_limit(project_root: &Path) -> anyhow::Result<MissionLineLimit> {

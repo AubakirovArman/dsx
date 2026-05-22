@@ -173,6 +173,9 @@ pub enum WorkspaceAction {
         /// Print machine-readable JSON
         #[arg(long)]
         json: bool,
+        /// Exit with an error when mission health is not clean
+        #[arg(long)]
+        check: bool,
     },
     /// Mark unfinished running run rows as stale across scopes
     CloseStaleRuns {

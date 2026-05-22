@@ -105,8 +105,14 @@ pub async fn run_workspace_action(
         Some(WorkspaceAction::Notes { limit, all, json }) => {
             list_workspace_notes(&project_root, limit, all, json).await
         }
-        Some(WorkspaceAction::Mission { limit, all, json }) => {
-            crate::workspace_mission::run_workspace_mission(&project_root, limit, all, json).await
+        Some(WorkspaceAction::Mission {
+            limit,
+            all,
+            json,
+            check,
+        }) => {
+            crate::workspace_mission::run_workspace_mission(&project_root, limit, all, json, check)
+                .await?
         }
         Some(WorkspaceAction::CloseStaleRuns {
             older_than_minutes,

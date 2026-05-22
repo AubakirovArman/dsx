@@ -1,6 +1,8 @@
 //! Text and JSON rendering for workspace mission snapshots.
 
-use crate::workspace_mission::{MissionLineLimit, MissionNote, MissionRunHealth, MissionSnapshot};
+use crate::workspace_mission::{
+    MissionLineLimit, MissionNote, MissionRunHealth, MissionSnapshot, mission_check_failures,
+};
 
 pub(crate) fn print_mission(snapshot: &MissionSnapshot, all: bool) {
     println!(
@@ -21,6 +23,7 @@ pub(crate) fn print_mission(snapshot: &MissionSnapshot, all: bool) {
 }
 
 pub(crate) fn mission_json(snapshot: &MissionSnapshot) -> serde_json::Value {
+    let check_failures = mission_check_failures(snapshot);
     serde_json::json!({
         "workspace": snapshot.workspace,
         "mission": {
@@ -37,6 +40,10 @@ pub(crate) fn mission_json(snapshot: &MissionSnapshot) -> serde_json::Value {
             "ok": snapshot.line_limit.ok,
             "violations": snapshot.line_limit.violations,
             "pressure": snapshot.line_limit.pressure,
+        },
+        "check": {
+            "ok": check_failures.is_empty(),
+            "failures": check_failures,
         },
         "scopes": snapshot.notes.iter().map(note_json).collect::<Vec<_>>(),
     })

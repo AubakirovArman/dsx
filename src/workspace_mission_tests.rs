@@ -15,8 +15,14 @@ async fn mission_snapshot_uses_saved_note_and_run_health() {
     assert_eq!(snapshot.goal, "ship mission view");
     assert_eq!(snapshot.run_health.recent_runs, 1);
     assert_eq!(snapshot.run_health.scope_violations, 1);
+    assert!(
+        mission_check_failures(&snapshot)
+            .iter()
+            .any(|failure| failure.contains("blocked scope"))
+    );
     assert_eq!(value["mission"]["goal"], "ship mission view");
     assert_eq!(value["line_limit"]["ok"], true);
+    assert_eq!(value["check"]["ok"], false);
     assert!(value["scopes"].as_array().unwrap().len() >= 2);
 
     let _ = std::fs::remove_dir_all(root);
@@ -32,6 +38,7 @@ async fn mission_snapshot_falls_back_without_saved_notes() {
 
     assert_eq!(snapshot.goal, "No saved goal yet.");
     assert_eq!(snapshot.active_scope, root.display().to_string());
+    assert!(mission_check_failures(&snapshot).is_empty());
 
     let _ = std::fs::remove_dir_all(root);
 }

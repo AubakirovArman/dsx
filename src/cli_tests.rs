@@ -73,6 +73,7 @@ mod tests {
             "workspace",
             "mission",
             "--json",
+            "--check",
             "--all",
             "--limit",
             "6",
@@ -80,7 +81,13 @@ mod tests {
         .unwrap();
 
         let Some(Command::Workspace {
-            action: Some(WorkspaceAction::Mission { limit, all, json }),
+            action:
+                Some(WorkspaceAction::Mission {
+                    limit,
+                    all,
+                    json,
+                    check,
+                }),
         }) = cli.command
         else {
             panic!("expected workspace mission command");
@@ -88,5 +95,6 @@ mod tests {
         assert_eq!(limit, 6);
         assert!(all);
         assert!(json);
+        assert!(check);
     }
 }
