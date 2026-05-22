@@ -11,6 +11,8 @@ pub mod context_capsule;
 #[cfg(test)]
 mod context_capsule_tests;
 pub mod context_preview;
+pub mod context_preview_metrics;
+pub mod context_preview_output;
 #[cfg(test)]
 mod context_preview_tests;
 pub mod doctor;
