@@ -99,7 +99,7 @@ pub(crate) fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
             KeyOutcome::Continue
         }
         KeyCode::Enter => {
-            draft_focused_scope_task(app);
+            app.lock().unwrap().draft_focused_scope_task();
             KeyOutcome::Continue
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -113,32 +113,6 @@ pub(crate) fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
         KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,
         _ => KeyOutcome::Continue,
     }
-}
-
-fn draft_focused_scope_task(app: &SharedApp) {
-    let mut app = app.lock().unwrap();
-    let Some(note) = app.focused_folder_note() else {
-        return;
-    };
-    let label = note.folder.trim().trim_end_matches('/').to_string();
-    let Some(scope) = app.focused_folder_scope() else {
-        app.add_message(
-            "error",
-            "Focused folder is not safe for scoped task drafting.",
-        );
-        return;
-    };
-    app.input = if label == "." {
-        "use current workspace only: ".into()
-    } else {
-        format!("use folder {label} only: ")
-    };
-    app.cursor_pos = app.input.chars().count();
-    app.show_context = false;
-    app.add_message(
-        "system",
-        &format!("Drafted scoped task for focused folder: {scope}"),
-    );
 }
 
 fn handle_approval_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> KeyOutcome {

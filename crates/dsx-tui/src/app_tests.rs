@@ -160,6 +160,28 @@ mod tests {
         assert!(app.focused_folder_scope().is_none());
     }
 
+    #[test]
+    fn draft_focused_scope_task_updates_input_or_reports_unsafe_note() {
+        let mut app = App::new();
+        app.show_context = true;
+        app.scope_lock.launch_scope = "/tmp/sites".into();
+        app.upsert_folder_note("/tmp/sites/1234", "state", "next");
+
+        assert!(app.draft_focused_scope_task());
+        assert_eq!(app.input, "use folder 1234 only: ");
+        assert_eq!(app.cursor_pos, app.input.chars().count());
+        assert!(!app.show_context);
+
+        app.show_context = true;
+        app.input = "keep".into();
+        app.set_folder_notes(vec![note("../outside/")]);
+
+        assert!(!app.draft_focused_scope_task());
+        assert_eq!(app.input, "keep");
+        assert!(app.show_context);
+        assert!(app.messages.iter().any(|msg| msg.role == "error"));
+    }
+
     fn note(folder: &str) -> FolderNote {
         FolderNote {
             folder: folder.into(),

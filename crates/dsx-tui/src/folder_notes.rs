@@ -80,6 +80,32 @@ impl App {
         Some(Path::new(launch).join(relative).display().to_string())
     }
 
+    pub fn draft_focused_scope_task(&mut self) -> bool {
+        let Some(note) = self.focused_folder_note() else {
+            return false;
+        };
+        let label = note.folder.trim().trim_end_matches('/').to_string();
+        let Some(scope) = self.focused_folder_scope() else {
+            self.add_message(
+                "error",
+                "Focused folder is not safe for scoped task drafting.",
+            );
+            return false;
+        };
+        self.input = if label == "." {
+            "use current workspace only: ".into()
+        } else {
+            format!("use folder {label} only: ")
+        };
+        self.cursor_pos = self.input.chars().count();
+        self.show_context = false;
+        self.add_message(
+            "system",
+            &format!("Drafted scoped task for focused folder: {scope}"),
+        );
+        true
+    }
+
     fn clamp_folder_note_cursor(&mut self) {
         if self.folder_notes.is_empty() {
             self.folder_note_cursor = 0;
