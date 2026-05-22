@@ -45,6 +45,7 @@ async fn collect_checks(project_root: &Path, api_base: &str, api_key: Option<&st
     checks.push(run_ledger_check(project_root).await);
     checks.push(capsule_check(project_root).await);
     checks.push(line_limit_check(project_root));
+    checks.push(mission_health_check(project_root).await);
     checks
 }
 
@@ -172,6 +173,31 @@ fn line_pressure_check(project_root: &Path) -> Check {
         ),
         Err(e) => fail("line-limit", format!("failed to scan Rust files: {e}")),
     }
+}
+
+async fn mission_health_check(project_root: &Path) -> Check {
+    let snapshot =
+        match crate::workspace_mission::collect_mission_snapshot(project_root, 8, true).await {
+            Ok(snapshot) => snapshot,
+            Err(e) => {
+                return fail(
+                    "mission",
+                    format!("failed to collect mission snapshot: {e}"),
+                );
+            }
+        };
+    let failures = crate::workspace_mission::mission_check_failures(&snapshot);
+    if failures.is_empty() {
+        return ok(
+            "mission",
+            format!(
+                "handoff clean; {} scope note(s), {} recent run(s)",
+                snapshot.notes.len(),
+                snapshot.run_health.recent_runs
+            ),
+        );
+    }
+    fail("mission", failures.join("; "))
 }
 
 fn format_line_counts(files: &[crate::line_limit::FileLineCount]) -> String {

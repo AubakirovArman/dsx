@@ -52,6 +52,57 @@ async fn capsule_check_reports_structured_context() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn mission_health_reports_clean_snapshot() {
+    let root = temp_root("dsx_doctor_mission_clean");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+
+    let check = mission_health_check(&root).await;
+
+    assert_eq!(check.status, CheckStatus::Ok);
+    assert_eq!(check.name, "mission");
+    assert!(check.detail.contains("handoff clean"));
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn mission_health_fails_on_scope_violations() {
+    let root = temp_root("dsx_doctor_mission_scope");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    seed_scope_violation_run(&root).await;
+
+    let check = mission_health_check(&root).await;
+
+    assert_eq!(check.status, CheckStatus::Fail);
+    assert!(check.detail.contains("blocked scope"));
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+async fn seed_scope_violation_run(root: &std::path::Path) {
+    let pool = dsx_memory::open(&root.join(".dsx").join("sessions.db"))
+        .await
+        .unwrap();
+    let id = dsx_memory::start_agent_run(&pool, None, &root.display().to_string(), "scope test")
+        .await
+        .unwrap();
+    dsx_memory::finish_agent_run(
+        &pool,
+        &id,
+        &dsx_memory::AgentRunUpdate {
+            status: "completed".into(),
+            scope_violations: 1,
+            last_scope_violation: "read_file: denied by active scope".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+}
+
 fn temp_root(name: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
