@@ -162,6 +162,18 @@ pub enum WorkspaceAction {
         #[arg(long)]
         json: bool,
     },
+    /// Show a compact mission handoff across notes, runs, scope guard, and line limits
+    Mission {
+        /// Maximum runs/scopes to inspect
+        #[arg(short, long, default_value_t = 8)]
+        limit: u32,
+        /// Include direct child folders and child .dsx ledgers
+        #[arg(long)]
+        all: bool,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Mark unfinished running run rows as stale across scopes
     CloseStaleRuns {
         /// Only close runs older than this many minutes

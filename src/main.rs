@@ -50,6 +50,8 @@ pub mod tui_task_finish;
 #[cfg(test)]
 mod tui_task_tests;
 pub mod workspace_audit;
+pub mod workspace_mission;
+pub mod workspace_mission_output;
 pub mod workspace_notes;
 #[cfg(test)]
 mod workspace_notes_tests;

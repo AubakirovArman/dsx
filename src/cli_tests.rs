@@ -65,4 +65,28 @@ mod tests {
         assert!(all);
         assert!(json);
     }
+
+    #[test]
+    fn parses_workspace_mission_flags() {
+        let cli = CliArgs::try_parse_from([
+            "dsx",
+            "workspace",
+            "mission",
+            "--json",
+            "--all",
+            "--limit",
+            "6",
+        ])
+        .unwrap();
+
+        let Some(Command::Workspace {
+            action: Some(WorkspaceAction::Mission { limit, all, json }),
+        }) = cli.command
+        else {
+            panic!("expected workspace mission command");
+        };
+        assert_eq!(limit, 6);
+        assert!(all);
+        assert!(json);
+    }
 }
