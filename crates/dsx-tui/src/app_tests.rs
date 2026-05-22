@@ -186,6 +186,18 @@ mod tests {
         assert_eq!(app.input, "use folder 1234 only: отполируй UI");
 
         app.show_context = true;
+        app.input = "используй папку old только отполируй UI".into();
+
+        assert!(app.draft_focused_scope_task());
+        assert_eq!(app.input, "use folder 1234 only: отполируй UI");
+
+        app.show_context = true;
+        app.input = "use folder old only polish UI".into();
+
+        assert!(app.draft_focused_scope_task());
+        assert_eq!(app.input, "use folder 1234 only: polish UI");
+
+        app.show_context = true;
         app.input = "используй текущий воркспейс только: проверь сборку".into();
 
         assert!(app.draft_focused_scope_task());

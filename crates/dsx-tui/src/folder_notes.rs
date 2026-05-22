@@ -161,8 +161,11 @@ fn task_body_without_scope_prefix(current: &str) -> &str {
 
     for (prefix, marker) in [
         ("use folder ", " only:"),
+        ("use folder ", " only "),
         ("используй папку ", " только:"),
+        ("используй папку ", " только "),
         ("используй каталог ", " только:"),
+        ("используй каталог ", " только "),
     ] {
         if let Some(rest) = lower.strip_prefix(prefix)
             && let Some(index) = rest.find(marker)
