@@ -12,7 +12,18 @@ pub(crate) fn finish_task(
     run_id: u64,
     rt: Handle,
 ) {
-    let (assistant, brief, tools, violations, last_violation, cost, tokens, ledger_id, snapshot) = {
+    let (
+        assistant,
+        brief,
+        tools,
+        violations,
+        last_violation,
+        cost,
+        tokens,
+        ledger_id,
+        refresh_root,
+        snapshot,
+    ) = {
         let mut app = app.lock().unwrap();
         if app.active_run_id != Some(run_id) {
             return;
@@ -42,6 +53,7 @@ pub(crate) fn finish_task(
             app.cost,
             app.tokens,
             app.active_ledger_id.take(),
+            crate::tui_run_health::refresh_root(&app, &active_root),
             snapshot,
         )
     };
@@ -57,7 +69,14 @@ pub(crate) fn finish_task(
         )
         .await;
     });
-    persist_run_ledger(&rt, ledger_id, active_root.clone(), snapshot);
+    persist_run_ledger_and_refresh(
+        &rt,
+        app.clone(),
+        ledger_id,
+        active_root.clone(),
+        refresh_root,
+        snapshot,
+    );
     if let (Some(msg), Some(sid), Some(pool)) = (assistant, session_id, pool) {
         let sm = dsx_session::SessionManager::new(pool);
         rt.spawn(async move {
@@ -79,17 +98,33 @@ fn run_status(task: &dsx_tui::AgentTask) -> (&'static str, Option<String>) {
     }
 }
 
-pub(crate) fn persist_run_ledger(
+pub(crate) fn persist_run_ledger_and_refresh(
     rt: &Handle,
+    app: SharedApp,
     ledger_id: Option<String>,
     active_scope: impl Into<PathBuf>,
+    refresh_root: impl Into<PathBuf>,
     snapshot: crate::run_ledger::RunLedgerSnapshot,
 ) {
     let Some(ledger_id) = ledger_id else {
+        crate::tui_run_health::spawn_refresh(app, refresh_root.into(), rt);
         return;
     };
     let active_scope = active_scope.into();
+    let refresh_root = refresh_root.into();
     rt.spawn(async move {
-        let _ = crate::run_ledger::record_finished(&active_scope, &ledger_id, snapshot).await;
+        if let Err(e) =
+            crate::run_ledger::record_finished(&active_scope, &ledger_id, snapshot).await
+        {
+            app.lock()
+                .unwrap()
+                .add_message("error", &format!("Run ledger finish failed: {e}"));
+            return;
+        }
+        if let Err(e) = crate::tui_run_health::refresh_now(&app, &refresh_root).await {
+            app.lock()
+                .unwrap()
+                .add_message("error", &format!("Run ledger refresh failed: {e}"));
+        }
     });
 }

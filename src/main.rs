@@ -49,6 +49,8 @@ mod tui_state_tests;
 pub mod tui_task;
 pub mod tui_task_finish;
 #[cfg(test)]
+mod tui_task_run_health_tests;
+#[cfg(test)]
 mod tui_task_tests;
 pub mod workspace_audit;
 pub mod workspace_mission;

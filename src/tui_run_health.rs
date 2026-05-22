@@ -1,5 +1,10 @@
 //! Mapping workspace run audit data into TUI run-ledger panels.
 
+use std::path::{Path, PathBuf};
+
+use crate::tui_state::SharedApp;
+use tokio::runtime::Handle;
+
 pub(crate) fn panel_from_audit(
     audit: &crate::workspace_audit::WorkspaceAudit,
 ) -> dsx_tui::RunLedgerPanel {
@@ -41,6 +46,31 @@ pub(crate) fn panel_from_audit(
     }
 }
 
+pub(crate) fn refresh_root(app: &dsx_tui::App, fallback: &Path) -> PathBuf {
+    let launch_scope = app.scope_lock.launch_scope.trim();
+    if launch_scope.is_empty() {
+        fallback.to_path_buf()
+    } else {
+        PathBuf::from(launch_scope)
+    }
+}
+
+pub(crate) fn spawn_refresh(app: SharedApp, workspace_root: PathBuf, rt: &Handle) {
+    rt.spawn(async move {
+        if let Err(e) = refresh_now(&app, &workspace_root).await {
+            app.lock()
+                .unwrap()
+                .add_message("error", &format!("Run ledger refresh failed: {e}"));
+        }
+    });
+}
+
+pub(crate) async fn refresh_now(app: &SharedApp, workspace_root: &Path) -> anyhow::Result<()> {
+    let audit = crate::workspace_audit::collect_workspace_audit(workspace_root, 6, true).await?;
+    app.lock().unwrap().run_ledger = panel_from_audit(&audit);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +109,16 @@ mod tests {
         assert_eq!(panel.total_tokens, 99);
         assert_eq!(panel.estimated_tokens_saved, 300);
         assert_eq!(panel.recent[0].scope, "1234");
+    }
+
+    #[test]
+    fn refresh_root_prefers_launch_scope() {
+        let mut app = dsx_tui::App::new();
+        app.scope_lock.launch_scope = "/tmp/launch".into();
+
+        assert_eq!(
+            refresh_root(&app, Path::new("/tmp/active")),
+            PathBuf::from("/tmp/launch")
+        );
     }
 }

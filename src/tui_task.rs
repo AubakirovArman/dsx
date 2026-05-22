@@ -2,7 +2,7 @@
 
 use crate::event_convert::convert_event;
 use crate::tui_state::SharedApp;
-use crate::tui_task_finish::persist_run_ledger;
+use crate::tui_task_finish::persist_run_ledger_and_refresh;
 use std::path::{Path, PathBuf};
 use tokio::{runtime::Handle, sync::mpsc, task::AbortHandle};
 
@@ -69,30 +69,42 @@ pub async fn start_agent_task(
 }
 
 pub fn stop_agent_task(app: &SharedApp, rt: &Handle) -> bool {
-    let mut app = app.lock().unwrap();
-    let Some(abort) = app.agent_abort.take() else {
-        app.add_message("system", "No active agent run to stop.");
-        return false;
+    let (ledger_id, active_scope, refresh_root, snapshot) = {
+        let mut state = app.lock().unwrap();
+        let Some(abort) = state.agent_abort.take() else {
+            state.add_message("system", "No active agent run to stop.");
+            return false;
+        };
+        abort.abort();
+        let ledger_id = state.active_ledger_id.take();
+        let active_scope = state.task_brief.active_scope.clone();
+        let active_scope_path = PathBuf::from(scope_text(&active_scope));
+        let snapshot = crate::run_ledger::RunLedgerSnapshot::from_app(
+            &state,
+            "cancelled",
+            Some("cancelled by user".into()),
+        );
+        let refresh_root = crate::tui_run_health::refresh_root(&state, &active_scope_path);
+        if let Some(approval) = state.pending_approval.take() {
+            let _ = approval.tx.send(false);
+        }
+        state.active_run_id = None;
+        state.current_reasoning.clear();
+        state.agent_task = dsx_tui::AgentTask::Error("cancelled by user".into());
+        state.task_brief.done = "Run cancelled by user.".into();
+        state.task_brief.last_changes = "Abort requested from TUI.".into();
+        state.task_brief.next_step = "Review partial output or enter a narrower task.".into();
+        state.add_message("system", "⏹ Agent run cancelled by user.");
+        (ledger_id, active_scope, refresh_root, snapshot)
     };
-    abort.abort();
-    let ledger_id = app.active_ledger_id.take();
-    let active_scope = app.task_brief.active_scope.clone();
-    let snapshot = crate::run_ledger::RunLedgerSnapshot::from_app(
-        &app,
-        "cancelled",
-        Some("cancelled by user".into()),
+    persist_run_ledger_and_refresh(
+        rt,
+        app.clone(),
+        ledger_id,
+        active_scope,
+        refresh_root,
+        snapshot,
     );
-    if let Some(approval) = app.pending_approval.take() {
-        let _ = approval.tx.send(false);
-    }
-    app.active_run_id = None;
-    app.current_reasoning.clear();
-    app.agent_task = dsx_tui::AgentTask::Error("cancelled by user".into());
-    app.task_brief.done = "Run cancelled by user.".into();
-    app.task_brief.last_changes = "Abort requested from TUI.".into();
-    app.task_brief.next_step = "Review partial output or enter a narrower task.".into();
-    app.add_message("system", "⏹ Agent run cancelled by user.");
-    persist_run_ledger(rt, ledger_id, active_scope, snapshot);
     true
 }
 
@@ -191,4 +203,8 @@ fn persist_user_message(
                 .await;
         });
     }
+}
+
+fn scope_text(scope: &str) -> &str {
+    if scope.trim().is_empty() { "." } else { scope }
 }
