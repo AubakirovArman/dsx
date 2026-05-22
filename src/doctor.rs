@@ -48,6 +48,7 @@ async fn collect_checks(project_root: &Path, api_base: &str, api_key: Option<&st
     checks.push(git_check(project_root));
     checks.push(memory_check(project_root).await);
     checks.push(run_ledger_check(project_root).await);
+    checks.push(capsule_check(project_root).await);
     checks.push(line_limit_check(project_root));
     checks
 }
@@ -112,6 +113,45 @@ async fn run_ledger_check(project_root: &Path) -> Check {
         ),
         Err(e) => warn("run-ledger", format!("failed to inspect run ledger: {e}")),
     }
+}
+
+async fn capsule_check(project_root: &Path) -> Check {
+    let preview = match crate::context_preview::build_context_preview(project_root, "doctor").await
+    {
+        Ok(preview) => preview,
+        Err(e) => return fail("capsule", format!("context preview failed: {e}")),
+    };
+    if let Err(e) = crate::context_preview::enforce_request_budget(&preview) {
+        return fail("capsule", e.to_string());
+    }
+    if !capsule_parts_ready(&preview.task_parts) {
+        return fail(
+            "capsule",
+            "structured task state is missing required fields",
+        );
+    }
+    ok(
+        "capsule",
+        format!(
+            "structured context ready; request ~{} / {} tokens",
+            preview.metrics.estimated_request_tokens, preview.metrics.max_request_tokens
+        ),
+    )
+}
+
+fn capsule_parts_ready(parts: &dsx_agent::brief::TaskBriefParts) -> bool {
+    [
+        &parts.goal,
+        &parts.done,
+        &parts.plan,
+        &parts.last_changes,
+        &parts.next_step,
+        &parts.active_scope,
+        &parts.constraints,
+        &parts.surface_architecture,
+    ]
+    .iter()
+    .all(|value| !value.trim().is_empty())
 }
 
 fn line_limit_check(project_root: &Path) -> Check {
@@ -222,6 +262,21 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].path, PathBuf::from("src/too_long.rs"));
         assert_eq!(violations[0].lines, 4);
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn capsule_check_reports_structured_context() {
+        let root = temp_root("dsx_doctor_capsule");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+        let check = capsule_check(&root).await;
+
+        assert_eq!(check.status, CheckStatus::Ok);
+        assert_eq!(check.name, "capsule");
+        assert!(check.detail.contains("structured context ready"));
 
         let _ = std::fs::remove_dir_all(root);
     }
