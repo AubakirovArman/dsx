@@ -36,6 +36,7 @@ mod tui_context_budget_tests;
 pub mod tui_keys;
 #[cfg(test)]
 mod tui_keys_tests;
+pub mod tui_modal_keys;
 pub mod tui_preflight;
 pub mod tui_run_ledger;
 pub mod tui_runner;

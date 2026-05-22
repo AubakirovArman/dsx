@@ -59,6 +59,8 @@ impl App {
 
         if self.show_diff {
             self.draw_diff(frame, main_workspace_area);
+        } else if self.show_mission {
+            self.draw_mission(frame, main_workspace_area);
         } else if self.show_settings {
             self.draw_settings(frame, main_workspace_area);
         } else if self.show_tools {

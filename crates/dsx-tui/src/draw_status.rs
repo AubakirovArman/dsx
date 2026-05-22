@@ -56,6 +56,8 @@ impl App {
             spans.extend(tools_keys(self.lang));
         } else if self.show_context {
             spans.extend(context_keys(self.lang));
+        } else if self.show_mission {
+            spans.extend(mission_keys(self.lang));
         } else if area.width >= 110 {
             spans.extend([
                 plain(" | model: "),
@@ -194,6 +196,21 @@ fn context_keys(lang: Language) -> Vec<Span<'static>> {
     ]
 }
 
+fn mission_keys(lang: Language) -> Vec<Span<'static>> {
+    vec![
+        plain(" | "),
+        key("Esc"),
+        plain(match lang {
+            Language::Russian => ":закрыть ",
+            Language::Kazakh => ":жабу ",
+            Language::Chinese => ":关闭 ",
+            Language::English => ":close ",
+        }),
+        key("Ctrl+M"),
+        plain(":mission "),
+    ]
+}
+
 fn main_keys(lang: Language, include_tree: bool, include_stop: bool) -> Vec<Span<'static>> {
     let mut spans = vec![key("Ctrl+S"), plain(tr(lang, "status_settings_toggle"))];
     if include_tree {
@@ -205,6 +222,8 @@ fn main_keys(lang: Language, include_tree: bool, include_stop: bool) -> Vec<Span
     spans.extend([
         key("Ctrl+B"),
         plain(":capsule "),
+        key("Ctrl+M"),
+        plain(":mission "),
         key("Ctrl+D"),
         plain(tr(lang, "status_diff_toggle")),
         key("Ctrl+L"),
@@ -242,23 +261,5 @@ fn plain_owned(label: String) -> Span<'static> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scope_badge_shows_narrow_active_folder() {
-        let mut app = App::new();
-        app.begin_task_scoped("build", "/tmp/sites", "/tmp/sites/1234", true);
-
-        assert_eq!(scope_badge(&app), "narrow:1234");
-    }
-
-    #[test]
-    fn scope_badge_marks_blocked_scope() {
-        let mut app = App::new();
-        app.scope_lock.active_scope = "/tmp/sites".into();
-        app.scope_lock.status = "Blocked".into();
-
-        assert_eq!(scope_badge(&app), "blocked:sites");
-    }
-}
+#[path = "draw_status_tests.rs"]
+mod tests;

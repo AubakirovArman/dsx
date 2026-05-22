@@ -5,6 +5,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::{Path, PathBuf};
 use tokio::runtime::Handle;
 
+#[cfg(test)]
+pub(crate) use crate::tui_modal_keys::handle_context_key;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyOutcome {
     Continue,
@@ -38,6 +41,7 @@ pub async fn handle_key(
         KeyCode::Char('t') if ctrl(key) => toggle(app, |a| a.show_file_tree = !a.show_file_tree),
         KeyCode::Char('s') if ctrl(key) => toggle(app, toggle_settings),
         KeyCode::Char('b') if ctrl(key) => toggle(app, toggle_context),
+        KeyCode::Char('m') if ctrl(key) => toggle(app, toggle_mission),
         KeyCode::Char('d') if ctrl(key) => toggle_diff(app, project_root),
         KeyCode::Char('l') if ctrl(key) => toggle(app, toggle_tools),
         KeyCode::Char('u') if ctrl(key) => rollback(app, project_root),
@@ -62,57 +66,18 @@ fn handle_modal_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> Option<KeyOu
         return Some(handle_diff_key(key, app));
     }
     if app.lock().unwrap().show_tools {
-        return Some(handle_tools_key(key, app));
+        return Some(crate::tui_modal_keys::handle_tools_key(key, app));
     }
     if app.lock().unwrap().show_context {
-        return Some(handle_context_key(key, app));
+        return Some(crate::tui_modal_keys::handle_context_key(key, app));
+    }
+    if app.lock().unwrap().show_mission {
+        return Some(crate::tui_modal_keys::handle_mission_key(key, app));
     }
     if app.lock().unwrap().show_settings {
         return Some(crate::tui_settings_keys::handle_settings_key(app, key));
     }
     None
-}
-
-fn handle_tools_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
-    match key.code {
-        KeyCode::Esc => {
-            app.lock().unwrap().show_tools = false;
-            KeyOutcome::Continue
-        }
-        KeyCode::Char('l') if ctrl(key) => {
-            app.lock().unwrap().show_tools = false;
-            KeyOutcome::Continue
-        }
-        KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,
-        _ => KeyOutcome::Continue,
-    }
-}
-
-pub(crate) fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
-    match key.code {
-        KeyCode::Esc => {
-            app.lock().unwrap().show_context = false;
-            KeyOutcome::Continue
-        }
-        KeyCode::Char('b') if ctrl(key) => {
-            app.lock().unwrap().show_context = false;
-            KeyOutcome::Continue
-        }
-        KeyCode::Enter => {
-            app.lock().unwrap().draft_focused_scope_task();
-            KeyOutcome::Continue
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.lock().unwrap().select_next_folder_note();
-            KeyOutcome::Continue
-        }
-        KeyCode::Up | KeyCode::Char('k') if !ctrl(key) => {
-            app.lock().unwrap().select_previous_folder_note();
-            KeyOutcome::Continue
-        }
-        KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,
-        _ => KeyOutcome::Continue,
-    }
 }
 
 fn handle_approval_key(key: KeyEvent, app: &SharedApp, rt: &Handle) -> KeyOutcome {
@@ -173,6 +138,7 @@ pub(crate) fn toggle_settings(app: &mut dsx_tui::App) {
         app.show_context = false;
         app.show_diff = false;
         app.show_tools = false;
+        app.show_mission = false;
     }
 }
 
@@ -182,6 +148,7 @@ pub(crate) fn toggle_context(app: &mut dsx_tui::App) {
         app.show_diff = false;
         app.show_settings = false;
         app.show_tools = false;
+        app.show_mission = false;
     }
 }
 
@@ -191,6 +158,17 @@ pub(crate) fn toggle_tools(app: &mut dsx_tui::App) {
         app.show_context = false;
         app.show_diff = false;
         app.show_settings = false;
+        app.show_mission = false;
+    }
+}
+
+pub(crate) fn toggle_mission(app: &mut dsx_tui::App) {
+    app.show_mission = !app.show_mission;
+    if app.show_mission {
+        app.show_context = false;
+        app.show_diff = false;
+        app.show_settings = false;
+        app.show_tools = false;
     }
 }
 
@@ -203,6 +181,7 @@ fn toggle_diff(app: &SharedApp, project_root: &Path) -> anyhow::Result<KeyOutcom
         app.show_context = false;
         app.show_settings = false;
         app.show_tools = false;
+        app.show_mission = false;
     }
     app.show_diff = !app.show_diff;
     Ok(KeyOutcome::Continue)

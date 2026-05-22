@@ -6,6 +6,8 @@ pub mod draw;
 pub mod draw_chat;
 pub mod draw_context;
 pub mod draw_input;
+pub mod draw_mission;
+pub mod draw_mission_state;
 pub mod draw_panes;
 pub mod draw_settings;
 pub mod draw_status;
@@ -44,6 +46,7 @@ pub struct App {
     pub show_diff: bool,
     pub show_tools: bool,
     pub show_context: bool,
+    pub show_mission: bool,
     pub current_diff: String,
     pub lang: Language,
     pub api_base: String,
@@ -108,6 +111,7 @@ impl App {
             show_diff: false,
             show_tools: false,
             show_context: false,
+            show_mission: false,
             current_diff: String::new(),
             lang: initial_lang,
             api_base: "https://api.deepseek.com".to_string(),
