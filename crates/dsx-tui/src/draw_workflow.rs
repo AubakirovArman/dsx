@@ -116,6 +116,10 @@ impl App {
                     Span::raw("  next: "),
                     Span::styled(note.next_step.as_str(), Style::default().fg(Color::Gray)),
                 ]));
+                lines.push(Line::from(vec![
+                    Span::raw("  arch: "),
+                    Span::styled(note.architecture.as_str(), Style::default().fg(Color::Blue)),
+                ]));
             }
         }
 

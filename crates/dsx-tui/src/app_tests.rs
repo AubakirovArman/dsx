@@ -91,6 +91,7 @@ mod tests {
             .unwrap();
         assert_eq!(note.summary, "inspected src/main.rs");
         assert!(note.next_step.contains("Continue"));
+        assert!(note.architecture.contains("active project folder"));
     }
 
     #[test]

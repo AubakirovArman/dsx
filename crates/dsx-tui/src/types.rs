@@ -93,6 +93,7 @@ pub struct FolderNote {
     pub folder: String,
     pub summary: String,
     pub next_step: String,
+    pub architecture: String,
 }
 
 #[derive(Debug, Clone)]

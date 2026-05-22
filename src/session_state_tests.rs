@@ -19,6 +19,7 @@ mod tests {
         let mut summary = dsx_memory::TaskSummary::new(&scoped.display().to_string());
         summary.last_changes = "patched workflow panel".into();
         summary.next_step = "run full gates".into();
+        summary.architecture = "1234/: tron web app".into();
         dsx_memory::upsert_task_summary(&pool, &summary)
             .await
             .unwrap();
@@ -29,7 +30,9 @@ mod tests {
 
         assert_eq!(scoped_note.summary, "patched workflow panel");
         assert_eq!(scoped_note.next_step, "run full gates");
+        assert_eq!(scoped_note.architecture, "1234/: tron web app");
         assert!(empty_note.summary.contains("project folder"));
+        assert!(empty_note.architecture.contains("empty/"));
 
         pool.close().await;
         let _ = std::fs::remove_dir_all(root);

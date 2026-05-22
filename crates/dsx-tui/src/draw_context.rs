@@ -94,6 +94,13 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
             Span::raw("    next: "),
             Span::styled(note.next_step.clone(), Style::default().fg(Color::Gray)),
         ]));
+        lines.push(Line::from(vec![
+            Span::raw("    arch: "),
+            Span::styled(
+                note.architecture.clone(),
+                Style::default().fg(Color::LightBlue),
+            ),
+        ]));
     }
 }
 

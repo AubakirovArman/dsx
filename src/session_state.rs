@@ -113,6 +113,12 @@ fn folder_note(name: &str, summary: Option<&dsx_memory::TaskSummary>) -> dsx_tui
                 .and_then(|summary| non_empty(&summary.next_step))
                 .unwrap_or("No saved task state yet."),
         ),
+        architecture: truncate_note(
+            summary
+                .and_then(|summary| non_empty(&summary.architecture))
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| format!("{name}/: {}", describe_dir(name))),
+        ),
     }
 }
 
