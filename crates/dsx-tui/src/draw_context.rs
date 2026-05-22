@@ -121,9 +121,7 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
     if let Some(note) = app.focused_folder_note() {
         lines.push(Line::from(""));
         push_inline(lines, "Focused", &note.folder, Color::LightCyan);
-        if let Some(scope) = app.focused_folder_scope() {
-            push_inline(lines, "Focused path", &scope, Color::Gray);
-        }
+        append_focused_action(app, lines);
         push_field(
             lines,
             "Focused next",
@@ -137,6 +135,25 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
             &note.architecture,
             Color::LightBlue,
             3,
+        );
+    }
+}
+
+fn append_focused_action(app: &App, lines: &mut Vec<Line<'static>>) {
+    if let Some(scope) = app.focused_folder_scope() {
+        push_inline(lines, "Focused path", &scope, Color::Gray);
+        push_inline(
+            lines,
+            "Focused action",
+            &format!("draft next task locked to {scope}"),
+            Color::LightGreen,
+        );
+    } else {
+        push_inline(
+            lines,
+            "Focused action",
+            "draft disabled for unsafe folder label",
+            Color::LightRed,
         );
     }
 }
