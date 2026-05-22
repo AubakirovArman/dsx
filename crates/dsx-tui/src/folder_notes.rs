@@ -6,21 +6,25 @@ use std::path::Path;
 impl App {
     pub fn set_folder_notes(&mut self, notes: Vec<FolderNote>) {
         self.folder_notes = notes;
+        self.clamp_folder_note_cursor();
     }
 
     pub fn upsert_folder_note(&mut self, scope: &str, summary: &str, next_step: &str) {
         let folder = scope_label(scope);
-        if let Some(note) = self
+        if let Some((index, note)) = self
             .folder_notes
             .iter_mut()
-            .find(|note| note.folder == folder)
+            .enumerate()
+            .find(|(_, note)| note.folder == folder)
         {
             note.summary = summary.into();
             note.next_step = next_step.into();
+            self.folder_note_cursor = index;
             return;
         }
         if self.folder_notes.len() >= 12 {
             self.folder_notes.remove(0);
+            self.folder_note_cursor = self.folder_note_cursor.saturating_sub(1);
         }
         self.folder_notes.push(FolderNote {
             architecture: folder_architecture(&folder),
@@ -28,6 +32,48 @@ impl App {
             summary: summary.into(),
             next_step: next_step.into(),
         });
+        self.folder_note_cursor = self.folder_notes.len().saturating_sub(1);
+    }
+
+    pub fn select_next_folder_note(&mut self) {
+        if self.folder_notes.is_empty() {
+            self.folder_note_cursor = 0;
+            return;
+        }
+        self.folder_note_cursor = (self.folder_note_cursor + 1) % self.folder_notes.len();
+    }
+
+    pub fn select_previous_folder_note(&mut self) {
+        if self.folder_notes.is_empty() {
+            self.folder_note_cursor = 0;
+            return;
+        }
+        if self.folder_note_cursor == 0 {
+            self.folder_note_cursor = self.folder_notes.len() - 1;
+        } else {
+            self.folder_note_cursor -= 1;
+        }
+    }
+
+    pub fn focused_folder_note_index(&self) -> Option<usize> {
+        if self.folder_notes.is_empty() {
+            None
+        } else {
+            Some(self.folder_note_cursor.min(self.folder_notes.len() - 1))
+        }
+    }
+
+    pub fn focused_folder_note(&self) -> Option<&FolderNote> {
+        self.focused_folder_note_index()
+            .and_then(|index| self.folder_notes.get(index))
+    }
+
+    fn clamp_folder_note_cursor(&mut self) {
+        if self.folder_notes.is_empty() {
+            self.folder_note_cursor = 0;
+        } else {
+            self.folder_note_cursor = self.folder_note_cursor.min(self.folder_notes.len() - 1);
+        }
     }
 }
 

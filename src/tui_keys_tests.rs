@@ -2,7 +2,10 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui_keys::{active_scope_path, toggle_context, toggle_settings, toggle_tools};
+    use crate::tui_keys::{
+        active_scope_path, handle_context_key, toggle_context, toggle_settings, toggle_tools,
+    };
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -59,5 +62,31 @@ mod tests {
         assert!(!app.show_diff);
         assert!(!app.show_tools);
         assert!(!app.show_settings);
+    }
+
+    #[test]
+    fn context_view_keys_move_folder_focus() {
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        {
+            let mut app = app.lock().unwrap();
+            app.upsert_folder_note("/tmp/sites/one", "one", "next");
+            app.upsert_folder_note("/tmp/sites/two", "two", "next");
+        }
+
+        handle_context_key(key(KeyCode::Down), &app);
+        assert_eq!(
+            app.lock().unwrap().focused_folder_note().unwrap().folder,
+            "one/"
+        );
+
+        handle_context_key(key(KeyCode::Up), &app);
+        assert_eq!(
+            app.lock().unwrap().focused_folder_note().unwrap().folder,
+            "two/"
+        );
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
     }
 }

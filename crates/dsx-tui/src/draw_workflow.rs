@@ -102,12 +102,20 @@ impl App {
                 Style::default().fg(Color::DarkGray),
             )]));
         } else {
-            for note in self.folder_notes.iter().take(4) {
+            let focused = self.focused_folder_note_index().unwrap_or(0);
+            let start = focused.saturating_sub(3);
+            for (index, note) in self.folder_notes.iter().enumerate().skip(start).take(4) {
+                let selected = index == focused;
                 lines.push(Line::from(vec![
+                    Span::raw(if selected { "> " } else { "  " }),
                     Span::styled(
                         note.folder.as_str(),
                         Style::default()
-                            .fg(Color::LightBlue)
+                            .fg(if selected {
+                                Color::LightCyan
+                            } else {
+                                Color::LightBlue
+                            })
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(note.summary.as_str(), Style::default().fg(Color::White)),

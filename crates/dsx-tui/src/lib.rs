@@ -59,6 +59,7 @@ pub struct App {
     pub task_brief: TaskBriefPanel,
     pub scope_lock: ScopeLockPanel,
     pub folder_notes: Vec<FolderNote>,
+    pub folder_note_cursor: usize,
     pub tool_timeline: Vec<ToolTimelineEntry>,
     pub allow_wide_scope: bool,
 }
@@ -122,6 +123,7 @@ impl App {
             task_brief: TaskBriefPanel::default(),
             scope_lock: ScopeLockPanel::default(),
             folder_notes: Vec::new(),
+            folder_note_cursor: 0,
             tool_timeline: Vec::new(),
             allow_wide_scope: false,
         }

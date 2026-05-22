@@ -83,10 +83,26 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
         )]));
         return;
     }
-    for note in app.folder_notes.iter().take(8) {
+    let focused = app.focused_folder_note_index().unwrap_or(0);
+    let start = focused.saturating_sub(7);
+    for (index, note) in app.folder_notes.iter().enumerate().skip(start).take(8) {
+        let selected = index == focused;
         lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(note.folder.clone(), Style::default().fg(Color::LightBlue)),
+            Span::raw(if selected { "> " } else { "  " }),
+            Span::styled(
+                note.folder.clone(),
+                Style::default()
+                    .fg(if selected {
+                        Color::LightCyan
+                    } else {
+                        Color::LightBlue
+                    })
+                    .add_modifier(if selected {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
+            ),
             Span::raw(" "),
             Span::styled(note.summary.clone(), Style::default().fg(Color::White)),
         ]));
@@ -101,6 +117,24 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
                 Style::default().fg(Color::LightBlue),
             ),
         ]));
+    }
+    if let Some(note) = app.focused_folder_note() {
+        lines.push(Line::from(""));
+        push_inline(lines, "Focused", &note.folder, Color::LightCyan);
+        push_field(
+            lines,
+            "Focused next",
+            &note.next_step,
+            Color::LightMagenta,
+            2,
+        );
+        push_field(
+            lines,
+            "Focused arch",
+            &note.architecture,
+            Color::LightBlue,
+            3,
+        );
     }
 }
 

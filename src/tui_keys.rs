@@ -88,7 +88,7 @@ fn handle_tools_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
     }
 }
 
-fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
+pub(crate) fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
     match key.code {
         KeyCode::Esc => {
             app.lock().unwrap().show_context = false;
@@ -96,6 +96,14 @@ fn handle_context_key(key: KeyEvent, app: &SharedApp) -> KeyOutcome {
         }
         KeyCode::Char('b') if ctrl(key) => {
             app.lock().unwrap().show_context = false;
+            KeyOutcome::Continue
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.lock().unwrap().select_next_folder_note();
+            KeyOutcome::Continue
+        }
+        KeyCode::Up | KeyCode::Char('k') if !ctrl(key) => {
+            app.lock().unwrap().select_previous_folder_note();
             KeyOutcome::Continue
         }
         KeyCode::Char('c') if ctrl(key) => KeyOutcome::Quit,

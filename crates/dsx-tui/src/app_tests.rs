@@ -127,4 +127,24 @@ mod tests {
         assert!(app.folder_notes.iter().any(|note| note.folder == "new/"));
         assert!(!app.folder_notes.iter().any(|note| note.folder == "p0/"));
     }
+
+    #[test]
+    fn folder_note_focus_wraps_and_tracks_updates() {
+        let mut app = App::new();
+        app.upsert_folder_note("/tmp/sites/one", "one", "next");
+        app.upsert_folder_note("/tmp/sites/two", "two", "next");
+
+        assert_eq!(app.focused_folder_note().unwrap().folder, "two/");
+
+        app.select_next_folder_note();
+        assert_eq!(app.focused_folder_note().unwrap().folder, "one/");
+
+        app.select_previous_folder_note();
+        assert_eq!(app.focused_folder_note().unwrap().folder, "two/");
+
+        app.upsert_folder_note("/tmp/sites/one", "updated", "verify");
+        let note = app.focused_folder_note().unwrap();
+        assert_eq!(note.folder, "one/");
+        assert_eq!(note.summary, "updated");
+    }
 }
