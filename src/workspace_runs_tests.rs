@@ -13,8 +13,14 @@ async fn all_runs_discovers_child_scope_ledgers() {
     let runs = collect_agent_runs(&root, 10, true).await.unwrap();
 
     assert_eq!(runs.len(), 2);
-    assert!(runs.iter().any(|run| scope_label(&root, run) == "."));
-    assert!(runs.iter().any(|run| scope_label(&root, run) == "1234"));
+    assert!(
+        runs.iter()
+            .any(|run| scope_label_for_db(&root, &run.db_path) == ".")
+    );
+    assert!(
+        runs.iter()
+            .any(|run| scope_label_for_db(&root, &run.db_path) == "1234")
+    );
 
     let _ = std::fs::remove_dir_all(root);
 }
@@ -50,6 +56,34 @@ async fn running_count_reports_unfinished_runs_across_scopes() {
     let count = running_run_count(&root).await.unwrap();
 
     assert_eq!(count, 1);
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn runs_json_exposes_summary_and_scope_contracts() {
+    let root = temp_root("dsx_runs_json");
+    let child = root.join("1234");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&child).unwrap();
+
+    seed_run(&root, "root task").await;
+    seed_running_run(&child, "child task").await;
+
+    let runs = collect_agent_runs(&root, 10, true).await.unwrap();
+    let json = crate::workspace_runs_output::runs_json(&root, 10, true, &runs);
+    let run_items = json["runs"].as_array().unwrap();
+
+    assert_eq!(json["all"], true);
+    assert_eq!(json["summary"]["total"], 2);
+    assert_eq!(json["summary"]["running"], 1);
+    assert_eq!(json["summary"]["scope_violations"], 1);
+    assert!(run_items.iter().any(|run| run["scope"] == "1234"));
+    assert!(
+        run_items
+            .iter()
+            .any(|run| run["scope_contract"]["violations"] == 1)
+    );
 
     let _ = std::fs::remove_dir_all(root);
 }

@@ -7,10 +7,14 @@ pub(crate) struct LocatedRun {
     pub(crate) run: dsx_memory::AgentRunRecord,
 }
 
-pub async fn list_agent_runs(project_root: &Path, limit: u32, all: bool) {
+pub async fn list_agent_runs(project_root: &Path, limit: u32, all: bool, json: bool) {
     match collect_agent_runs(project_root, limit, all).await {
+        Ok(runs) if json => println!(
+            "{}",
+            crate::workspace_runs_output::runs_json(project_root, limit, all, &runs)
+        ),
         Ok(runs) if runs.is_empty() => println!("No agent runs yet."),
-        Ok(runs) => print_runs(project_root, &runs, all),
+        Ok(runs) => crate::workspace_runs_output::print_runs(project_root, &runs, all),
         Err(e) => println!("DB error: {e}"),
     }
 }
@@ -99,64 +103,6 @@ fn skip_dir(dir: &Path) -> bool {
         dir.file_name().and_then(|name| name.to_str()),
         Some(".git" | "target" | "node_modules")
     )
-}
-
-fn print_runs(project_root: &Path, runs: &[LocatedRun], all: bool) {
-    println!(
-        "Recent agent runs{}:",
-        if all { " across scopes" } else { "" }
-    );
-    for located in runs {
-        print_run(project_root, located, all);
-    }
-}
-
-fn print_run(project_root: &Path, located: &LocatedRun, all: bool) {
-    let run = &located.run;
-    println!(
-        "  {}  {}  {} tok  ${:.4}  compact:{}/~{}tok  scope:{}  {}",
-        &run.id[..8.min(run.id.len())],
-        run.status,
-        run.total_tokens,
-        run.estimated_cost_usd,
-        run.compaction_events,
-        run.estimated_tokens_saved,
-        run.scope_violations,
-        run.started_at.chars().take(19).collect::<String>(),
-    );
-    if all {
-        println!("      scope: {}", scope_label(project_root, located));
-    }
-    if !run.active_scope.trim().is_empty() {
-        println!(
-            "      contract: {} -> {} ({})",
-            scope_text(&run.launch_scope),
-            scope_text(&run.active_scope),
-            run.scope_status
-        );
-        println!(
-            "      reason: {}",
-            crate::handlers::task_preview(&run.scope_reason)
-        );
-    }
-    println!("      {}", crate::handlers::task_preview(&run.task_excerpt));
-    if let Some(error) = &run.error {
-        println!("      error: {}", crate::handlers::task_preview(error));
-    }
-    if run.scope_violations > 0 {
-        println!(
-            "      scope_guard: {}",
-            crate::handlers::task_preview(&run.last_scope_violation)
-        );
-    }
-}
-
-fn scope_text(value: &str) -> &str {
-    if value.trim().is_empty() { "." } else { value }
-}
-
-fn scope_label(project_root: &Path, located: &LocatedRun) -> String {
-    scope_label_for_db(project_root, &located.db_path)
 }
 
 pub(crate) fn scope_label_for_db(project_root: &Path, db_path: &Path) -> String {

@@ -137,6 +137,9 @@ pub enum WorkspaceAction {
         /// Include .dsx run ledgers in child task scopes
         #[arg(long)]
         all: bool,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
     },
     /// Show one-screen workspace health across scope, runs, notes, and budgets
     Audit {

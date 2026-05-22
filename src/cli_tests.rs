@@ -67,6 +67,30 @@ mod tests {
     }
 
     #[test]
+    fn parses_workspace_runs_json_flags() {
+        let cli = CliArgs::try_parse_from([
+            "dsx",
+            "workspace",
+            "runs",
+            "--json",
+            "--all",
+            "--limit",
+            "5",
+        ])
+        .unwrap();
+
+        let Some(Command::Workspace {
+            action: Some(WorkspaceAction::Runs { limit, all, json }),
+        }) = cli.command
+        else {
+            panic!("expected workspace runs command");
+        };
+        assert_eq!(limit, 5);
+        assert!(all);
+        assert!(json);
+    }
+
+    #[test]
     fn parses_workspace_mission_flags() {
         let cli = CliArgs::try_parse_from([
             "dsx",

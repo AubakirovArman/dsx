@@ -96,8 +96,8 @@ pub async fn run_workspace_action(
 ) -> anyhow::Result<()> {
     match action {
         None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
-        Some(WorkspaceAction::Runs { limit, all }) => {
-            list_agent_runs(&project_root, limit, all).await
+        Some(WorkspaceAction::Runs { limit, all, json }) => {
+            list_agent_runs(&project_root, limit, all, json).await
         }
         Some(WorkspaceAction::Audit { limit, all, json }) => {
             crate::workspace_audit::run_workspace_audit(&project_root, limit, all, json).await

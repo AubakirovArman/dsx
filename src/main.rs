@@ -56,6 +56,7 @@ pub mod workspace_notes;
 #[cfg(test)]
 mod workspace_notes_tests;
 pub mod workspace_runs;
+pub mod workspace_runs_output;
 pub mod workspace_stale_runs;
 
 use agent_preflight::run_agent_preflight;
