@@ -10,6 +10,7 @@ pub(crate) struct WorkspaceAudit {
     pub(crate) running_runs: usize,
     pub(crate) stale_runs: i64,
     pub(crate) line_violations: Vec<String>,
+    pub(crate) line_pressure: Vec<String>,
     pub(crate) runs: Vec<AuditRun>,
     pub(crate) notes: Vec<AuditNote>,
     pub(crate) scope_violations: i64,
@@ -49,8 +50,16 @@ pub(crate) async fn collect_workspace_audit(
     let line_violations =
         crate::line_limit::rust_line_violations(project_root, crate::line_limit::MAX_RS_LINES)?
             .into_iter()
-            .map(|item| format!("{}={} lines", item.path.display(), item.lines))
+            .map(line_count_label)
             .collect::<Vec<_>>();
+    let line_pressure = crate::line_limit::rust_line_pressure(
+        project_root,
+        crate::line_limit::PRESSURE_RS_LINES,
+        crate::line_limit::MAX_RS_LINES,
+    )?
+    .into_iter()
+    .map(line_count_label)
+    .collect::<Vec<_>>();
     let running_runs = crate::workspace_runs::running_run_count(project_root).await?;
     let stale_runs = crate::workspace_stale_runs::stale_run_count(project_root, STALE_MINUTES)
         .await
@@ -67,6 +76,7 @@ pub(crate) async fn collect_workspace_audit(
         running_runs,
         stale_runs,
         line_violations,
+        line_pressure,
         runs: audit_runs,
         notes: notes
             .iter()
@@ -154,6 +164,7 @@ fn audit_json(audit: &WorkspaceAudit) -> serde_json::Value {
         "line_limit": {
             "ok": audit.line_violations.is_empty(),
             "violations": audit.line_violations,
+            "pressure": audit.line_pressure,
         },
         "scope_violations": audit.scope_violations,
         "runs": audit.runs.iter().map(run_json).collect::<Vec<_>>(),
@@ -183,9 +194,18 @@ fn note_json(note: &AuditNote) -> serde_json::Value {
 
 fn line_status(audit: &WorkspaceAudit) -> String {
     if audit.line_violations.is_empty() {
-        return format!("ok; Rust files <= {}", crate::line_limit::MAX_RS_LINES);
+        let mut status = format!("ok; Rust files <= {}", crate::line_limit::MAX_RS_LINES);
+        if !audit.line_pressure.is_empty() {
+            status.push_str("; pressure: ");
+            status.push_str(&audit.line_pressure.join(", "));
+        }
+        return status;
     }
     format!("fail; {}", audit.line_violations.join(", "))
+}
+
+fn line_count_label(item: crate::line_limit::FileLineCount) -> String {
+    format!("{}={} lines", item.path.display(), item.lines)
 }
 
 fn scope_text(value: &str) -> &str {
@@ -193,77 +213,5 @@ fn scope_text(value: &str) -> &str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn audit_surfaces_scope_contracts_and_notes() {
-        let root = temp_root("dsx_workspace_audit");
-        let child = root.join("1234");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&child).unwrap();
-        seed_run(&child, &root).await;
-        seed_note(&child).await;
-
-        let audit = collect_workspace_audit(&root, 10, true).await.unwrap();
-        let value = audit_json(&audit);
-
-        assert_eq!(audit.running_runs, 0);
-        assert_eq!(audit.scope_violations, 1);
-        assert!(audit.runs[0].contract.contains("Narrowed"));
-        assert_eq!(value["line_limit"]["ok"], true);
-        assert_eq!(value["runs"][0]["scope"], "1234");
-
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    async fn seed_run(child: &Path, root: &Path) {
-        let pool = dsx_memory::open(&child.join(".dsx").join("sessions.db"))
-            .await
-            .unwrap();
-        let id = dsx_memory::start_scoped_agent_run(
-            &pool,
-            &dsx_memory::AgentRunStart {
-                session_id: None,
-                project_root: &child.display().to_string(),
-                task: "build 1234",
-                launch_scope: &root.display().to_string(),
-                active_scope: &child.display().to_string(),
-                scope_status: "Narrowed",
-                scope_reason: "Task selected a subfolder.",
-            },
-        )
-        .await
-        .unwrap();
-        dsx_memory::finish_agent_run(
-            &pool,
-            &id,
-            &dsx_memory::AgentRunUpdate {
-                status: "completed".into(),
-                scope_violations: 1,
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    async fn seed_note(child: &Path) {
-        let pool = dsx_memory::open(&child.join(".dsx").join("sessions.db"))
-            .await
-            .unwrap();
-        let mut summary = dsx_memory::TaskSummary::new(&child.display().to_string());
-        summary.next_step = "verify gates".into();
-        dsx_memory::upsert_task_summary(&pool, &summary)
-            .await
-            .unwrap();
-    }
-
-    fn temp_root(name: &str) -> std::path::PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{name}_{nanos}"))
-    }
-}
+#[path = "workspace_audit_tests.rs"]
+mod tests;
