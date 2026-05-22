@@ -36,8 +36,11 @@ pub fn configure_initial_app(
     app.api_key = api_key;
     app.allow_wide_scope = allow_wide_scope;
     app.mode = initial_mode.as_str().to_string();
-    let budget_status = dsx_agent::budget::format_limits(dsx_agent::budget::current_limits());
+    let budget_limits = dsx_agent::budget::current_limits();
+    let budget_status = dsx_agent::budget::format_limits(budget_limits);
     app.budget_status = budget_status.clone();
+    app.run_budget.max_tokens = budget_limits.max_run_tokens;
+    app.run_budget.max_cost_usd = budget_limits.max_run_cost_usd;
     app.scope_lock.launch_scope = project_root.display().to_string();
     app.scope_lock.active_scope = project_root.display().to_string();
     app.add_message(

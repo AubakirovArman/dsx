@@ -39,9 +39,15 @@ pub fn convert_event(ev: &dsx_provider::streaming::StreamEvent) -> dsx_tui::Agen
             retained_messages: *retained_messages,
             estimated_tokens_saved: *estimated_tokens_saved,
         },
-        dsx_provider::streaming::StreamEvent::Finish { .. } => {
-            dsx_tui::AgentStreamEvent::Reasoning(String::new())
-        }
+        dsx_provider::streaming::StreamEvent::Finish { usage, .. } => usage
+            .as_ref()
+            .map(|usage| dsx_tui::AgentStreamEvent::Usage {
+                prompt_tokens: usage.prompt_tokens as u64,
+                completion_tokens: usage.completion_tokens as u64,
+                reasoning_tokens: usage.reasoning_tokens.unwrap_or(0) as u64,
+                total_tokens: usage.total_tokens as u64,
+            })
+            .unwrap_or_else(|| dsx_tui::AgentStreamEvent::Reasoning(String::new())),
         dsx_provider::streaming::StreamEvent::Done {
             answer,
             iterations,

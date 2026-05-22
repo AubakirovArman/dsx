@@ -19,6 +19,8 @@ pub mod context_preview_output;
 mod context_preview_tests;
 pub mod doctor;
 pub mod event_convert;
+#[cfg(test)]
+mod event_convert_tests;
 pub mod handlers;
 pub mod line_limit;
 pub mod main_runtime;

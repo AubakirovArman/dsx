@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod app_tests;
 pub mod draw;
+pub mod draw_budget;
 pub mod draw_chat;
 pub mod draw_context;
 pub mod draw_input;
@@ -21,8 +22,9 @@ pub mod stream_events;
 pub mod types;
 
 pub use types::{
-    AgentStreamEvent, AgentTask, ChatMessage, FolderNote, Language, PendingApproval, RunLedgerItem,
-    RunLedgerPanel, ScopeLockPanel, TaskBriefPanel, ToolTimelineEntry,
+    AgentStreamEvent, AgentTask, ChatMessage, FolderNote, Language, PendingApproval,
+    RunBudgetPanel, RunLedgerItem, RunLedgerPanel, ScopeLockPanel, TaskBriefPanel,
+    ToolTimelineEntry,
 };
 
 /// Shared app state.
@@ -66,6 +68,7 @@ pub struct App {
     pub scope_lock: ScopeLockPanel,
     pub folder_notes: Vec<FolderNote>,
     pub folder_note_cursor: usize,
+    pub run_budget: RunBudgetPanel,
     pub run_ledger: RunLedgerPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
     pub allow_wide_scope: bool,
@@ -132,6 +135,7 @@ impl App {
             scope_lock: ScopeLockPanel::default(),
             folder_notes: Vec::new(),
             folder_note_cursor: 0,
+            run_budget: RunBudgetPanel::default(),
             run_ledger: RunLedgerPanel::default(),
             tool_timeline: Vec::new(),
             allow_wide_scope: false,
@@ -156,6 +160,10 @@ impl App {
     ) {
         self.run_start_tokens = self.tokens;
         self.run_start_cost = self.cost;
+        self.run_budget.used_tokens = 0;
+        self.run_budget.estimated_cost_usd = 0.0;
+        self.run_budget.status = "running".into();
+        self.run_budget.last_update = "Waiting for first model usage.".into();
         self.task_brief = TaskBriefPanel {
             goal: truncate_chars(task, 260),
             done: "Task accepted; context brief prepared.".into(),

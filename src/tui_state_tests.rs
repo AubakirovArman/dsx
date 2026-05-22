@@ -29,6 +29,7 @@ mod tests {
         assert!(file_tree.contains(&"top.txt".into()));
         assert!(file_tree.contains(&"1234/".into()));
         assert!(!file_tree.iter().any(|path| path.contains("main.rs")));
+        assert!(app.lock().unwrap().run_budget.max_tokens > 0);
 
         let _ = std::fs::remove_dir_all(root);
     }

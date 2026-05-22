@@ -26,6 +26,17 @@ impl App {
                     *estimated_tokens_saved,
                 );
             }
+            AgentStreamEvent::Usage {
+                prompt_tokens,
+                completion_tokens,
+                reasoning_tokens,
+                total_tokens,
+            } => self.handle_usage(
+                *prompt_tokens,
+                *completion_tokens,
+                *reasoning_tokens,
+                *total_tokens,
+            ),
             AgentStreamEvent::Done {
                 answer: _ans,
                 iterations,
@@ -91,9 +102,28 @@ impl App {
         self.add_message("system", &format!("Context compacted: {summary}"));
     }
 
+    fn handle_usage(
+        &mut self,
+        prompt_tokens: u64,
+        completion_tokens: u64,
+        reasoning_tokens: u64,
+        total_tokens: u64,
+    ) {
+        let counted = total_tokens.max(prompt_tokens + completion_tokens + reasoning_tokens);
+        self.run_budget.used_tokens = self.run_budget.used_tokens.saturating_add(counted);
+        self.run_budget.last_update = format!(
+            "last request: {counted} tok (prompt {prompt_tokens}, completion {completion_tokens}, reasoning {reasoning_tokens})"
+        );
+        self.update_run_budget_status(true);
+    }
+
     fn handle_done(&mut self, iterations: usize, tokens: u64, cost: f64) {
         self.tokens += tokens;
         self.cost += cost;
+        self.run_budget.used_tokens = self.run_budget.used_tokens.max(tokens);
+        self.run_budget.estimated_cost_usd = cost;
+        self.run_budget.last_update = format!("completed: {tokens} reported tok, ${cost:.4}");
+        self.update_run_budget_status(false);
         self.current_reasoning.clear();
         self.agent_task = AgentTask::Done(format!("{iterations} iterations, ${cost:.4}"));
         self.task_brief.done = format!("Completed in {iterations} iteration(s).");
@@ -105,6 +135,12 @@ impl App {
         self.add_message("error", err);
         self.current_reasoning.clear();
         self.agent_task = AgentTask::Error(err.into());
+        self.run_budget.status = if err.contains("budget") || err.contains("runaway") {
+            "over".into()
+        } else {
+            "failed".into()
+        };
+        self.run_budget.last_update = err.chars().take(180).collect();
         self.task_brief.done = "Run failed.".into();
         self.task_brief.last_changes = err.chars().take(220).collect();
         self.task_brief.next_step = "Inspect the error and retry with a narrower task.".into();
@@ -135,6 +171,17 @@ impl App {
         let active = self.task_brief.active_scope.clone();
         let next_step = self.task_brief.next_step.clone();
         self.upsert_folder_note(&active, summary, &next_step);
+    }
+
+    fn update_run_budget_status(&mut self, running: bool) {
+        self.run_budget.status = crate::draw_budget::budget_status(
+            self.run_budget.used_tokens,
+            self.run_budget.max_tokens,
+            self.run_budget.estimated_cost_usd,
+            self.run_budget.max_cost_usd,
+            running,
+        )
+        .into();
     }
 }
 

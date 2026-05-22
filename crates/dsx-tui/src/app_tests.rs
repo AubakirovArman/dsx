@@ -41,6 +41,27 @@ mod tests {
         assert_eq!(app.compaction_events, 0);
         assert_eq!(app.compacted_messages, 0);
         assert_eq!(app.estimated_tokens_saved, 0);
+        assert_eq!(app.run_budget.used_tokens, 0);
+        assert_eq!(app.run_budget.status, "running");
+    }
+
+    #[test]
+    fn stream_usage_updates_run_budget_without_session_tokens() {
+        let mut app = App::new();
+        app.run_budget.max_tokens = 100;
+        app.run_budget.max_cost_usd = 2.0;
+
+        app.handle_stream_event(&AgentStreamEvent::Usage {
+            prompt_tokens: 80,
+            completion_tokens: 5,
+            reasoning_tokens: 5,
+            total_tokens: 85,
+        });
+
+        assert_eq!(app.tokens, 0);
+        assert_eq!(app.run_budget.used_tokens, 90);
+        assert_eq!(app.run_budget.status, "near");
+        assert!(app.run_budget.last_update.contains("reasoning 5"));
     }
 
     #[test]

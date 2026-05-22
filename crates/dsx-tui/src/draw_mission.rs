@@ -1,6 +1,7 @@
 //! Mission Control view for live task state, scope, and tool activity.
 
 use crate::App;
+use crate::draw_budget::run_budget_line;
 use crate::draw_mission_state::{
     empty_as, mission_tool_counts, scope_color, scope_guard_text, scope_status, task_state,
     tool_status_color,
@@ -52,6 +53,10 @@ fn summary_panel(app: &App) -> Paragraph<'static> {
             label("Budget "),
             value(empty_as(&app.budget_status, "not measured")),
             gap(),
+            label("Run "),
+            value(run_budget_line(app)),
+        ]),
+        Line::from(vec![
             label("Compact "),
             value(format!(
                 "{} event(s), {} msg, ~{} tok saved",

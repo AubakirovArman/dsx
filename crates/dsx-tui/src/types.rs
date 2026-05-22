@@ -120,6 +120,29 @@ pub struct RunLedgerItem {
 }
 
 #[derive(Debug, Clone)]
+pub struct RunBudgetPanel {
+    pub used_tokens: u64,
+    pub max_tokens: u64,
+    pub estimated_cost_usd: f64,
+    pub max_cost_usd: f64,
+    pub status: String,
+    pub last_update: String,
+}
+
+impl Default for RunBudgetPanel {
+    fn default() -> Self {
+        Self {
+            used_tokens: 0,
+            max_tokens: 0,
+            estimated_cost_usd: 0.0,
+            max_cost_usd: 0.0,
+            status: "idle".into(),
+            last_update: "No run usage yet.".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ToolTimelineEntry {
     pub name: String,
     pub status: String,
@@ -154,6 +177,13 @@ pub enum AgentStreamEvent {
         removed_messages: usize,
         retained_messages: usize,
         estimated_tokens_saved: usize,
+    },
+    /// Token usage reported after a streamed model request.
+    Usage {
+        prompt_tokens: u64,
+        completion_tokens: u64,
+        reasoning_tokens: u64,
+        total_tokens: u64,
     },
     /// Task completed.
     Done {

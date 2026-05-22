@@ -1,6 +1,7 @@
 //! Bottom status bar rendering.
 
 use crate::App;
+use crate::draw_budget::run_budget_badge;
 use crate::i18n::tr;
 use crate::types::{AgentTask, Language};
 use ratatui::{
@@ -70,6 +71,8 @@ impl App {
                 strong_owned(scope_badge(self)),
                 plain(" | fuse: "),
                 plain_owned(self.budget_status.clone()),
+                plain(" | run: "),
+                plain_owned(run_budget_badge(self)),
                 plain(" | "),
             ]);
             spans.extend(main_keys(self.lang, true, running));
