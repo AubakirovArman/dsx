@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::{AgentStreamEvent, App, FolderNote};
+    use crate::{AgentStreamEvent, App, FolderNote, Language};
 
     #[test]
     fn transcript_compaction_updates_visible_telemetry() {
@@ -202,6 +202,13 @@ mod tests {
 
         assert!(app.draft_focused_scope_task());
         assert_eq!(app.input, "use folder 1234 only: проверь сборку");
+
+        app.show_context = true;
+        app.lang = Language::Russian;
+        app.input = "отполируй UI".into();
+
+        assert!(app.draft_focused_scope_task());
+        assert_eq!(app.input, "используй папку 1234 только: отполируй UI");
 
         app.show_context = true;
         app.input = "keep".into();

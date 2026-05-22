@@ -1,6 +1,6 @@
 //! Compact per-folder note helpers for the workflow panel.
 
-use crate::{App, FolderNote};
+use crate::{App, FolderNote, Language};
 use std::path::{Component, Path};
 
 impl App {
@@ -92,11 +92,7 @@ impl App {
             );
             return false;
         };
-        let prefix = if label == "." {
-            "use current workspace only:".to_string()
-        } else {
-            format!("use folder {label} only:")
-        };
+        let prefix = scoped_task_prefix(self.lang, &label);
         self.input = scoped_task_input(&prefix, &self.input);
         self.cursor_pos = self.input.chars().count();
         self.show_context = false;
@@ -143,6 +139,20 @@ fn scoped_task_input(prefix: &str, current: &str) -> String {
         format!("{prefix} ")
     } else {
         format!("{prefix} {body}")
+    }
+}
+
+fn scoped_task_prefix(lang: Language, label: &str) -> String {
+    if label == "." {
+        return match lang {
+            Language::Russian => "используй текущий воркспейс только:".into(),
+            _ => "use current workspace only:".into(),
+        };
+    }
+
+    match lang {
+        Language::Russian => format!("используй папку {label} только:"),
+        _ => format!("use folder {label} only:"),
     }
 }
 
