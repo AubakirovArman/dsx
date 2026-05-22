@@ -148,15 +148,28 @@ fn scoped_task_input(prefix: &str, current: &str) -> String {
 
 fn task_body_without_scope_prefix(current: &str) -> &str {
     let trimmed = current.trim();
-    let lower = trimmed.to_ascii_lowercase();
-    if lower.starts_with("use current workspace only:") {
-        return trimmed["use current workspace only:".len()..].trim_start();
+    let lower = trimmed.to_lowercase();
+    for prefix in [
+        "use current workspace only:",
+        "используй текущий воркспейс только:",
+        "используй текущую папку только:",
+    ] {
+        if lower.starts_with(prefix) {
+            return trimmed[prefix.len()..].trim_start();
+        }
     }
-    if let Some(rest) = lower.strip_prefix("use folder ")
-        && let Some(index) = rest.find(" only:")
-    {
-        let body_start = "use folder ".len() + index + " only:".len();
-        return trimmed[body_start..].trim_start();
+
+    for (prefix, marker) in [
+        ("use folder ", " only:"),
+        ("используй папку ", " только:"),
+        ("используй каталог ", " только:"),
+    ] {
+        if let Some(rest) = lower.strip_prefix(prefix)
+            && let Some(index) = rest.find(marker)
+        {
+            let body_start = prefix.len() + index + marker.len();
+            return trimmed[body_start..].trim_start();
+        }
     }
     trimmed
 }
