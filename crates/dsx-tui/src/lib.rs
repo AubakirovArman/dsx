@@ -6,6 +6,7 @@ pub mod draw;
 pub mod draw_chat;
 pub mod draw_context;
 pub mod draw_input;
+pub mod draw_panes;
 pub mod draw_settings;
 pub mod draw_status;
 pub mod draw_tools;

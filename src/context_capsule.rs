@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+pub(crate) use crate::context_capsule_json::capsule_json;
+
 pub(crate) struct ContextCapsule {
     pub(crate) task: String,
     pub(crate) clean_task: String,
@@ -43,7 +45,7 @@ pub async fn run_context_capsule(
     if json {
         println!("{}", capsule_json(&capsule));
     } else {
-        print_capsule(&capsule);
+        crate::context_capsule_output::print_capsule(&capsule);
     }
     Ok(())
 }
@@ -95,135 +97,6 @@ async fn collect_capsule_context(active_root: &Path) -> anyhow::Result<dsx_conte
     })
 }
 
-fn print_capsule(capsule: &ContextCapsule) {
-    println!("Context capsule:");
-    println!("  Task: {}", crate::handlers::task_preview(&capsule.task));
-    println!(
-        "  Clean task: {}",
-        crate::handlers::task_preview(&capsule.clean_task)
-    );
-    println!("  Launch: {}", capsule.launch_scope);
-    println!("  Active: {}", capsule.active_scope);
-    println!(
-        "  Status: {}",
-        if capsule.narrowed { "NARROWED" } else { "WIDE" }
-    );
-    println!(
-        "  Active exists: {}",
-        if capsule.active_exists { "yes" } else { "no" }
-    );
-    println!("  Scope contract: tools locked to active scope");
-    if !capsule.narrowed {
-        println!("  Scope warning: workspace-wide until a child folder is selected");
-    }
-    println!(
-        "  Capsule estimate: ~{} token(s), {} folder note(s)",
-        capsule.metrics.estimated_capsule_tokens, capsule.metrics.folder_note_count
-    );
-    print_handoff(capsule);
-    println!("\n{}", capsule.task_state.render());
-    print_folder_notes(&capsule.folder_notes);
-}
-
-fn print_handoff(capsule: &ContextCapsule) {
-    println!("\nSession handoff:");
-    println!(
-        "  goal: {}",
-        crate::handlers::task_preview(&capsule.task_state.goal)
-    );
-    println!("  done: {}", flatten(&capsule.task_state.done));
-    println!("  next: {}", flatten(&capsule.task_state.next_step));
-    println!("  tool root: {}", capsule.active_scope);
-    println!(
-        "  health: {} recent, {} running, {} failed, {} cancelled, {} blocked escape(s)",
-        capsule.run_health.recent_runs,
-        capsule.run_health.running_runs,
-        capsule.run_health.failed_runs,
-        capsule.run_health.cancelled_runs,
-        capsule.run_health.scope_violations
-    );
-}
-
-fn print_folder_notes(notes: &[crate::workspace_notes::WorkspaceNote]) {
-    if notes.is_empty() {
-        println!("\nFolder notes:\n  - (none)");
-        return;
-    }
-
-    println!("\nFolder notes:");
-    for note in notes {
-        println!(
-            "  - {} [{}]",
-            note.label,
-            if note.saved { "saved" } else { "fallback" }
-        );
-        println!("    last: {}", flatten(&note.last_changes));
-        println!("    next: {}", flatten(&note.next_step));
-        println!("    arch: {}", flatten(&note.architecture));
-    }
-}
-
-pub(crate) fn capsule_json(capsule: &ContextCapsule) -> serde_json::Value {
-    serde_json::json!({
-        "task": capsule.task,
-        "clean_task": capsule.clean_task,
-        "launch_scope": capsule.launch_scope,
-        "active_scope": capsule.active_scope,
-        "narrowed": capsule.narrowed,
-        "active_exists": capsule.active_exists,
-        "scope_contract": scope_contract_json(capsule),
-        "handoff": handoff_json(capsule),
-        "task_state": capsule.task_state,
-        "folder_notes": crate::workspace_notes::notes_json_value(&capsule.folder_notes),
-        "run_health": run_health_json(&capsule.run_health),
-        "metrics": {
-            "task_state_chars": capsule.metrics.task_state_chars,
-            "folder_note_count": capsule.metrics.folder_note_count,
-            "estimated_capsule_tokens": capsule.metrics.estimated_capsule_tokens,
-        },
-    })
-}
-
-fn handoff_json(capsule: &ContextCapsule) -> serde_json::Value {
-    serde_json::json!({
-        "goal": capsule.task_state.goal,
-        "done": capsule.task_state.done,
-        "plan": capsule.task_state.plan,
-        "last_changes": capsule.task_state.last_changes,
-        "next_step": capsule.task_state.next_step,
-        "constraints": capsule.task_state.constraints,
-        "surface_architecture": capsule.task_state.surface_architecture,
-        "scope_contract": scope_contract_json(capsule),
-        "folder_notes": crate::workspace_notes::notes_json_value(&capsule.folder_notes),
-        "run_health": run_health_json(&capsule.run_health),
-    })
-}
-
-fn scope_contract_json(capsule: &ContextCapsule) -> serde_json::Value {
-    serde_json::json!({
-        "launch_scope": capsule.launch_scope,
-        "active_scope": capsule.active_scope,
-        "tool_root": capsule.active_scope,
-        "status": if capsule.narrowed { "narrowed" } else { "wide" },
-        "active_exists": capsule.active_exists,
-        "rule": "read/write/commands are locked to active_scope",
-        "warning": if capsule.narrowed { "" } else { "workspace-wide until a child folder is selected" },
-    })
-}
-
-fn run_health_json(health: &CapsuleRunHealth) -> serde_json::Value {
-    serde_json::json!({
-        "recent_runs": health.recent_runs,
-        "running_runs": health.running_runs,
-        "failed_runs": health.failed_runs,
-        "cancelled_runs": health.cancelled_runs,
-        "total_tokens": health.total_tokens,
-        "compaction_events": health.compaction_events,
-        "estimated_tokens_saved": health.estimated_tokens_saved,
-        "scope_violations": health.scope_violations,
-    })
-}
-
 async fn capsule_run_health(project_root: &Path, limit: u32) -> CapsuleRunHealth {
     let Ok(runs) =
         crate::workspace_runs::collect_agent_runs(project_root, limit.max(1), true).await
@@ -269,8 +142,4 @@ fn capsule_metrics(
         folder_note_count: notes.len(),
         estimated_capsule_tokens: (chars as u64 / 4).max(1),
     }
-}
-
-fn flatten(value: &str) -> String {
-    value.replace('\n', " | ")
 }

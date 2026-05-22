@@ -8,6 +8,8 @@ pub mod cli_context_budget;
 mod cli_tests;
 pub mod context_budget_advice;
 pub mod context_capsule;
+pub mod context_capsule_json;
+pub mod context_capsule_output;
 #[cfg(test)]
 mod context_capsule_tests;
 pub mod context_preview;
