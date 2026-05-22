@@ -12,6 +12,7 @@ pub(crate) struct ContextPreview {
     pub(crate) system_note: String,
     pub(crate) project_context: String,
     pub(crate) task_brief: String,
+    pub(crate) task_parts: dsx_agent::brief::TaskBriefParts,
     pub(crate) project_instructions: Option<String>,
     pub(crate) metrics: ContextMetrics,
 }
@@ -56,7 +57,8 @@ pub(crate) async fn build_context_preview(
     let clean_task = dsx_agent::brief::clean_task_input(task);
     let ctx = collect_preview_context(&scope.active_root).await?;
     let project_context = dsx_context::format_context(&ctx);
-    let task_brief = dsx_agent::brief::build_task_brief(&clean_task, &scope, &ctx);
+    let task_parts = dsx_agent::brief::build_task_brief_parts(&clean_task, &scope, &ctx);
+    let task_brief = task_parts.render();
     let project_instructions = scope
         .active_root
         .exists()
@@ -80,6 +82,7 @@ pub(crate) async fn build_context_preview(
         system_note: scope.system_note(),
         project_context,
         task_brief,
+        task_parts,
         project_instructions,
         metrics,
     })

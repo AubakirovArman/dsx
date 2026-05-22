@@ -21,12 +21,17 @@ mod tests {
         );
 
         let ok = preflight_context_budget(&app, "доработай 1234").await;
+        let expected_scope = child.canonicalize().unwrap().display().to_string();
         let app = app.lock().unwrap();
 
         assert!(ok);
         assert!(app.budget_status.contains("capsule request"));
+        assert_eq!(app.task_brief.goal, "доработай 1234");
         assert!(app.task_brief.done.contains("Context capsule"));
-        assert!(app.task_brief.next_step.contains("compact capsule"));
+        assert!(app.task_brief.plan.contains("Inspect only"));
+        assert!(app.task_brief.last_changes.contains("capsule request"));
+        assert!(app.task_brief.next_step.contains("Start scoped inspection"));
+        assert_eq!(app.task_brief.active_scope, expected_scope);
         assert!(
             app.messages
                 .iter()

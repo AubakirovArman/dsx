@@ -32,9 +32,14 @@ pub(crate) fn mark_ready(app: &SharedApp, preview: &ContextPreview) {
     let line = crate::context_preview::budget_line(preview);
     let mut app = app.lock().unwrap();
     app.budget_status = line.clone();
-    app.task_brief.done = "Context capsule prepared before model call.".into();
-    app.task_brief.last_changes = line.clone();
-    app.task_brief.next_step = "Start model call with compact capsule context.".into();
+    app.task_brief = dsx_tui::TaskBriefPanel {
+        goal: preview.task_parts.goal.clone(),
+        done: format!("Context capsule prepared. {}", preview.task_parts.done),
+        plan: preview.task_parts.plan.clone(),
+        last_changes: format!("{}\n{}", line, preview.task_parts.last_changes),
+        next_step: preview.task_parts.next_step.clone(),
+        active_scope: preview.task_parts.active_scope.clone(),
+    };
     app.add_message("system", &format!("Context budget preflight: {line}"));
 }
 
