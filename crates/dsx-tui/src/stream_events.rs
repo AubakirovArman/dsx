@@ -83,7 +83,6 @@ impl App {
             self.record_scope_violation(name, &short);
         }
         self.push_tool_event(name, status, &short);
-        self.add_message("tool", &format!("{} {name} - {short}", icon_for(status)));
     }
 
     fn handle_transcript_compact(
@@ -99,7 +98,6 @@ impl App {
             "{removed_messages} msg compacted, ~{estimated_tokens_saved} tok saved, {retained_messages} retained"
         );
         self.push_tool_event("context_compact", "ok", &summary);
-        self.add_message("system", &format!("Context compacted: {summary}"));
     }
 
     fn handle_usage(
@@ -155,7 +153,7 @@ impl App {
         );
     }
 
-    fn push_tool_event(&mut self, name: &str, status: &str, summary: &str) {
+    pub fn push_tool_event(&mut self, name: &str, status: &str, summary: &str) {
         self.tool_timeline.push(ToolTimelineEntry {
             name: name.into(),
             status: status.into(),
@@ -190,14 +188,6 @@ fn is_scope_violation(denied: bool, _risk: &str, summary: &str) -> bool {
         && (summary.contains("active scope")
             || summary.contains("path traversal blocked")
             || summary.contains("leaves active scope"))
-}
-
-fn icon_for(status: &str) -> &'static str {
-    match status {
-        "ok" => "OK",
-        "blocked" => "BLOCKED",
-        _ => "FAIL",
-    }
 }
 
 fn next_step_for(status: &str) -> String {

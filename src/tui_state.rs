@@ -44,26 +44,8 @@ pub fn configure_initial_app(
     app.run_budget.max_cost_usd = budget_limits.max_run_cost_usd;
     app.scope_lock.launch_scope = project_root.display().to_string();
     app.scope_lock.active_scope = project_root.display().to_string();
-    app.add_message(
-        "system",
-        &format!("Launch workspace: {}", project_root.display()),
-    );
-    app.add_message("system", &format!("Budget fuse: {budget_status}"));
-    app.add_message(
-        "system",
-        "Semantic indexing deferred until active task scope.",
-    );
-    if allow_wide_scope {
-        app.add_message("system", "Wide scope guard disabled by explicit policy.");
-    }
-    app.add_message(
-        "system",
-        &format!(
-            "Mode: {} — {}",
-            initial_mode.as_str(),
-            initial_mode.description()
-        ),
-    );
+    app.push_tool_event("workspace_launch", "ok", &format!("Workspace root: {}", project_root.display()));
+    
     load_history(&mut app, history_events);
     ensure_git(project_root, &mut app);
     if let Ok(files) = dsx_fs::list_files(project_root) {
@@ -76,18 +58,15 @@ pub fn start_active_scope_indexing(app: SharedApp, active_root: PathBuf, rt: &Ha
         match index_active_scope(&active_root).await {
             Ok(count) => {
                 let mut app = app.lock().unwrap();
-                app.add_message(
-                    "system",
-                    &format!(
-                        "✓ Active-scope index complete: {count} symbols in {}.",
-                        active_root.display()
-                    ),
+                app.push_tool_event(
+                    "active_scope_indexing",
+                    "ok",
+                    &format!("{count} symbols in {}", active_root.display()),
                 );
             }
             Err(e) => {
-                app.lock()
-                    .unwrap()
-                    .add_message("error", &format!("Active-scope indexing failed: {e}"));
+                let mut app = app.lock().unwrap();
+                app.push_tool_event("active_scope_indexing", "failed", &e.to_string());
             }
         }
     });

@@ -18,11 +18,6 @@ mod tests {
         assert_eq!(app.compacted_messages, 12);
         assert_eq!(app.estimated_tokens_saved, 340);
         assert!(
-            app.messages
-                .iter()
-                .any(|msg| msg.content.contains("Context compacted"))
-        );
-        assert!(
             app.tool_timeline
                 .iter()
                 .any(|entry| entry.name == "context_compact")

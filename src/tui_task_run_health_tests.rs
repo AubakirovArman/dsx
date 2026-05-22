@@ -97,14 +97,21 @@ mod tests {
             }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
+        let msgs = app.lock().unwrap().messages.clone();
+        println!("FAIL: expected total {}, messages in app:", expected);
+        for m in msgs {
+            println!("  [{}] {}", m.role, m.content);
+        }
         app.lock().unwrap().run_ledger.clone()
     }
 
     fn temp_root(name: &str) -> std::path::PathBuf {
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("{name}_{nanos}"))
+        std::env::temp_dir().join(format!("{name}_{id}_{nanos}"))
     }
 }

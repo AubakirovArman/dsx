@@ -38,7 +38,9 @@ pub async fn open(path: &Path) -> anyhow::Result<SqlitePool> {
     let pool = SqlitePool::connect(&url).await?;
 
     // Configure SQLite performance and high concurrency optimizations
-    let _ = sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await;
+    if !cfg!(test) {
+        let _ = sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await;
+    }
     let _ = sqlx::query("PRAGMA busy_timeout=10000;")
         .execute(&pool)
         .await;
