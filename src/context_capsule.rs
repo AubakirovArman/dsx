@@ -11,6 +11,7 @@ pub(crate) struct ContextCapsule {
     pub(crate) active_exists: bool,
     pub(crate) task_state: dsx_agent::brief::TaskBriefParts,
     pub(crate) folder_notes: Vec<crate::workspace_notes::WorkspaceNote>,
+    pub(crate) run_health: CapsuleRunHealth,
     pub(crate) metrics: CapsuleMetrics,
 }
 
@@ -18,6 +19,18 @@ pub(crate) struct CapsuleMetrics {
     pub(crate) task_state_chars: usize,
     pub(crate) folder_note_count: usize,
     pub(crate) estimated_capsule_tokens: u64,
+}
+
+#[derive(Default)]
+pub(crate) struct CapsuleRunHealth {
+    pub(crate) recent_runs: usize,
+    pub(crate) running_runs: usize,
+    pub(crate) failed_runs: usize,
+    pub(crate) cancelled_runs: usize,
+    pub(crate) total_tokens: i64,
+    pub(crate) compaction_events: i64,
+    pub(crate) estimated_tokens_saved: i64,
+    pub(crate) scope_violations: i64,
 }
 
 pub async fn run_context_capsule(
@@ -47,6 +60,7 @@ pub(crate) async fn build_context_capsule(
     let folder_notes = crate::workspace_notes::collect_workspace_notes(project_root, limit, true)
         .await
         .unwrap_or_default();
+    let run_health = capsule_run_health(project_root, limit).await;
     let metrics = capsule_metrics(&task_state, &folder_notes);
 
     Ok(ContextCapsule {
@@ -58,6 +72,7 @@ pub(crate) async fn build_context_capsule(
         active_exists: scope.active_root.exists(),
         task_state,
         folder_notes,
+        run_health,
         metrics,
     })
 }
@@ -105,8 +120,28 @@ fn print_capsule(capsule: &ContextCapsule) {
         "  Capsule estimate: ~{} token(s), {} folder note(s)",
         capsule.metrics.estimated_capsule_tokens, capsule.metrics.folder_note_count
     );
+    print_handoff(capsule);
     println!("\n{}", capsule.task_state.render());
     print_folder_notes(&capsule.folder_notes);
+}
+
+fn print_handoff(capsule: &ContextCapsule) {
+    println!("\nSession handoff:");
+    println!(
+        "  goal: {}",
+        crate::handlers::task_preview(&capsule.task_state.goal)
+    );
+    println!("  done: {}", flatten(&capsule.task_state.done));
+    println!("  next: {}", flatten(&capsule.task_state.next_step));
+    println!("  tool root: {}", capsule.active_scope);
+    println!(
+        "  health: {} recent, {} running, {} failed, {} cancelled, {} blocked escape(s)",
+        capsule.run_health.recent_runs,
+        capsule.run_health.running_runs,
+        capsule.run_health.failed_runs,
+        capsule.run_health.cancelled_runs,
+        capsule.run_health.scope_violations
+    );
 }
 
 fn print_folder_notes(notes: &[crate::workspace_notes::WorkspaceNote]) {
@@ -136,23 +171,87 @@ pub(crate) fn capsule_json(capsule: &ContextCapsule) -> serde_json::Value {
         "active_scope": capsule.active_scope,
         "narrowed": capsule.narrowed,
         "active_exists": capsule.active_exists,
-        "scope_contract": {
-            "launch_scope": capsule.launch_scope,
-            "active_scope": capsule.active_scope,
-            "tool_root": capsule.active_scope,
-            "status": if capsule.narrowed { "narrowed" } else { "wide" },
-            "active_exists": capsule.active_exists,
-            "rule": "read/write/commands are locked to active_scope",
-            "warning": if capsule.narrowed { "" } else { "workspace-wide until a child folder is selected" },
-        },
+        "scope_contract": scope_contract_json(capsule),
+        "handoff": handoff_json(capsule),
         "task_state": capsule.task_state,
         "folder_notes": crate::workspace_notes::notes_json_value(&capsule.folder_notes),
+        "run_health": run_health_json(&capsule.run_health),
         "metrics": {
             "task_state_chars": capsule.metrics.task_state_chars,
             "folder_note_count": capsule.metrics.folder_note_count,
             "estimated_capsule_tokens": capsule.metrics.estimated_capsule_tokens,
         },
     })
+}
+
+fn handoff_json(capsule: &ContextCapsule) -> serde_json::Value {
+    serde_json::json!({
+        "goal": capsule.task_state.goal,
+        "done": capsule.task_state.done,
+        "plan": capsule.task_state.plan,
+        "last_changes": capsule.task_state.last_changes,
+        "next_step": capsule.task_state.next_step,
+        "constraints": capsule.task_state.constraints,
+        "surface_architecture": capsule.task_state.surface_architecture,
+        "scope_contract": scope_contract_json(capsule),
+        "folder_notes": crate::workspace_notes::notes_json_value(&capsule.folder_notes),
+        "run_health": run_health_json(&capsule.run_health),
+    })
+}
+
+fn scope_contract_json(capsule: &ContextCapsule) -> serde_json::Value {
+    serde_json::json!({
+        "launch_scope": capsule.launch_scope,
+        "active_scope": capsule.active_scope,
+        "tool_root": capsule.active_scope,
+        "status": if capsule.narrowed { "narrowed" } else { "wide" },
+        "active_exists": capsule.active_exists,
+        "rule": "read/write/commands are locked to active_scope",
+        "warning": if capsule.narrowed { "" } else { "workspace-wide until a child folder is selected" },
+    })
+}
+
+fn run_health_json(health: &CapsuleRunHealth) -> serde_json::Value {
+    serde_json::json!({
+        "recent_runs": health.recent_runs,
+        "running_runs": health.running_runs,
+        "failed_runs": health.failed_runs,
+        "cancelled_runs": health.cancelled_runs,
+        "total_tokens": health.total_tokens,
+        "compaction_events": health.compaction_events,
+        "estimated_tokens_saved": health.estimated_tokens_saved,
+        "scope_violations": health.scope_violations,
+    })
+}
+
+async fn capsule_run_health(project_root: &Path, limit: u32) -> CapsuleRunHealth {
+    let Ok(runs) =
+        crate::workspace_runs::collect_agent_runs(project_root, limit.max(1), true).await
+    else {
+        return CapsuleRunHealth::default();
+    };
+
+    let mut health = CapsuleRunHealth {
+        recent_runs: runs.len(),
+        ..Default::default()
+    };
+    for located in runs {
+        let run = located.run;
+        if run.status == "running" {
+            health.running_runs += 1;
+        }
+        if run.status == "failed" || run.error.is_some() {
+            health.failed_runs += 1;
+        }
+        if run.cancelled {
+            health.cancelled_runs += 1;
+        }
+        health.total_tokens += run.total_tokens;
+        health.compaction_events += run.compaction_events;
+        health.estimated_tokens_saved += run.estimated_tokens_saved;
+        health.scope_violations += run.scope_violations;
+    }
+    health
 }
 
 fn capsule_metrics(
