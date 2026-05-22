@@ -4,9 +4,7 @@ use crate::build_tool_defs;
 use crate::tool_defs::compact_tool_content;
 use crate::types::{AgentConfig, AgentOutcome, ToolResult};
 use dsx_provider::streaming::StreamEvent;
-use dsx_provider::types::{
-    ChatRequest, FunctionCall, Message, StreamOptions, ThinkingConfig, ToolCall,
-};
+use dsx_provider::types::{ChatRequest, FunctionCall, Message, StreamOptions, ToolCall};
 
 /// Execute a natural language task and block until a final answer is returned.
 pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcome> {
@@ -62,13 +60,7 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
             messages: messages.clone(),
             stream: Some(true),
             tools: Some(tools.clone()),
-            thinking: if thinking {
-                Some(ThinkingConfig {
-                    type_: "enabled".into(),
-                })
-            } else {
-                None
-            },
+            thinking: Some(crate::conversation::thinking_config(thinking)),
             reasoning_effort: effort.map(|e| e.to_string()),
             max_tokens: Some(16384),
             stream_options: Some(StreamOptions {
@@ -141,21 +133,12 @@ pub async fn run(task: &str, config: &AgentConfig) -> anyhow::Result<AgentOutcom
         }
 
         // Commit reasoning/content to conversation history
-        messages.push(Message {
-            role: "assistant".into(),
-            content: if content.is_empty() {
-                None
-            } else {
-                Some(content.clone())
-            },
-            tool_calls: if finish_calls.is_empty() {
-                None
-            } else {
-                Some(finish_calls)
-            },
-            tool_call_id: None,
-            reasoning_content: None,
-        });
+        messages.push(crate::conversation::assistant_message(
+            &content,
+            finish_calls,
+            &reasoning,
+            thinking,
+        ));
 
         // Break if finished without further tool calls
         if tool_calls.is_empty() {

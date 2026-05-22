@@ -24,6 +24,8 @@ mod event_convert_tests;
 pub mod handlers;
 pub mod line_limit;
 pub mod main_runtime;
+#[cfg(test)]
+mod main_runtime_tests;
 pub mod run_ledger;
 pub mod scope_guard;
 pub mod session_state;
@@ -82,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
         std::fs::canonicalize(&cli.workspace).unwrap_or_else(|_| cli.workspace.clone());
     let app_config = load_config_or_default(&project_root);
     let mode = initial_mode(&cli, &app_config);
-    let api_key = api_key(&cli, &app_config);
+    let api_key = api_key(&cli, &app_config, &project_root);
     let allow_wide_scope = cli.allow_wide_scope || app_config.scope.allow_wide;
     let api_base = cli
         .api_base

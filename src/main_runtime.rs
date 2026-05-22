@@ -30,11 +30,16 @@ pub fn initial_mode(
         .unwrap_or(dsx_core::types::PermissionMode::Ask)
 }
 
-pub fn api_key(cli: &CliArgs, app_config: &dsx_config::AppConfig) -> Option<String> {
+pub fn api_key(
+    cli: &CliArgs,
+    app_config: &dsx_config::AppConfig,
+    project_root: &std::path::Path,
+) -> Option<String> {
     cli.api_key
         .clone()
         .or_else(|| std::env::var(&app_config.provider.api_key_env).ok())
         .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+        .or_else(|| api_key_file(project_root))
 }
 
 pub fn require_api_key(api_key: Option<String>) -> Option<String> {
@@ -42,6 +47,19 @@ pub fn require_api_key(api_key: Option<String>) -> Option<String> {
         println!("(Set DEEPSEEK_API_KEY or use --api-key)");
     }
     api_key
+}
+
+pub(crate) fn api_key_file(project_root: &std::path::Path) -> Option<String> {
+    for dir in project_root.ancestors() {
+        let path = dir.join(".deepseek");
+        if path.is_file()
+            && let Ok(content) = std::fs::read_to_string(path)
+            && let Some(key) = content.lines().map(str::trim).find(|line| !line.is_empty())
+        {
+            return Some(key.to_string());
+        }
+    }
+    None
 }
 
 pub async fn create_session(
