@@ -16,6 +16,8 @@ mod context_preview_tests;
 pub mod doctor;
 pub mod event_convert;
 pub mod handlers;
+pub mod line_limit;
+pub mod main_runtime;
 pub mod run_ledger;
 pub mod scope_guard;
 pub mod session_state;
@@ -50,16 +52,14 @@ pub mod workspace_stale_runs;
 
 use agent_preflight::run_agent_preflight;
 use clap::Parser;
-use cli::{CliArgs, Command, IndexAction, McpAction, WorkspaceAction};
+use cli::{CliArgs, Command};
 use context_capsule::run_context_capsule;
 use context_preview::run_context_preview;
-use handlers::{
-    list_sessions, run_edit, run_eval, run_index_build, run_index_search, run_mcp_call,
-    run_mcp_list, run_plan, run_scope_preview, task_preview,
+use handlers::{run_edit, run_eval, run_plan, run_scope_preview, task_preview};
+use main_runtime::{
+    api_key, create_session, initial_mode, load_config_or_default, require_api_key,
+    run_index_action, run_mcp_action, run_workspace_action,
 };
-use workspace_notes::list_workspace_notes;
-use workspace_runs::list_agent_runs;
-use workspace_stale_runs::close_stale_runs;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -146,155 +146,6 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?
         }
-    }
-    Ok(())
-}
-
-fn load_config_or_default(project_root: &std::path::Path) -> dsx_config::AppConfig {
-    match dsx_config::load_for_project(project_root) {
-        Ok(config) => config,
-        Err(e) => {
-            eprintln!("Warning: failed to load config: {e}");
-            dsx_config::AppConfig::default()
-        }
-    }
-}
-
-fn initial_mode(
-    cli: &CliArgs,
-    app_config: &dsx_config::AppConfig,
-) -> dsx_core::types::PermissionMode {
-    let mode_name = cli
-        .mode
-        .as_deref()
-        .unwrap_or(app_config.app.default_mode.as_str());
-    dsx_core::types::PermissionMode::parse(mode_name)
-        .unwrap_or(dsx_core::types::PermissionMode::Ask)
-}
-
-fn api_key(cli: &CliArgs, app_config: &dsx_config::AppConfig) -> Option<String> {
-    cli.api_key
-        .clone()
-        .or_else(|| std::env::var(&app_config.provider.api_key_env).ok())
-        .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
-}
-
-fn require_api_key(api_key: Option<String>) -> Option<String> {
-    if api_key.is_none() {
-        println!("(Set DEEPSEEK_API_KEY or use --api-key)");
-    }
-    api_key
-}
-
-async fn create_session(
-    project_root: &std::path::Path,
-    mode: dsx_core::types::PermissionMode,
-) -> (Option<sqlx::SqlitePool>, Option<String>) {
-    let db_path = project_root.join(".dsx").join("sessions.db");
-    match dsx_memory::open(&db_path).await {
-        Ok(pool) => {
-            let sm = dsx_session::SessionManager::new(pool.clone());
-            match sm
-                .create(&project_root.display().to_string(), mode.as_str())
-                .await
-            {
-                Ok(session) => (Some(pool), Some(session.id)),
-                Err(_) => (Some(pool), None),
-            }
-        }
-        Err(_) => (None, None),
-    }
-}
-
-async fn run_index_action(
-    project_root: &std::path::Path,
-    action: IndexAction,
-) -> anyhow::Result<()> {
-    match action {
-        IndexAction::Build => run_index_build(project_root).await,
-        IndexAction::Search { query, limit } => run_index_search(project_root, &query, limit).await,
-    }
-}
-
-async fn run_mcp_action(action: McpAction) -> anyhow::Result<()> {
-    match action {
-        McpAction::List { command, args } => run_mcp_list(&command, &args).await,
-        McpAction::Call {
-            tool,
-            arguments_json,
-            command,
-            args,
-        } => run_mcp_call(&command, &args, &tool, &arguments_json).await,
-    }
-}
-
-async fn run_workspace_action(
-    project_root: std::path::PathBuf,
-    api_key: Option<String>,
-    api_base: String,
-    mode: dsx_core::types::PermissionMode,
-    allow_wide_scope: bool,
-    action: Option<WorkspaceAction>,
-) -> anyhow::Result<()> {
-    match action {
-        None | Some(WorkspaceAction::List) => list_sessions(&project_root).await,
-        Some(WorkspaceAction::Runs { limit, all }) => {
-            list_agent_runs(&project_root, limit, all).await
-        }
-        Some(WorkspaceAction::Audit { limit, all, json }) => {
-            crate::workspace_audit::run_workspace_audit(&project_root, limit, all, json).await
-        }
-        Some(WorkspaceAction::Notes { limit, all, json }) => {
-            list_workspace_notes(&project_root, limit, all, json).await
-        }
-        Some(WorkspaceAction::CloseStaleRuns {
-            older_than_minutes,
-            dry_run,
-        }) => close_stale_runs(&project_root, older_than_minutes, dry_run).await,
-        Some(WorkspaceAction::Resume { id }) => {
-            let Some(key) = require_api_key(api_key) else {
-                return Ok(());
-            };
-            resume_session(project_root, key, api_base, mode, allow_wide_scope, id).await?;
-        }
-    }
-    Ok(())
-}
-
-async fn resume_session(
-    project_root: std::path::PathBuf,
-    api_key: String,
-    api_base: String,
-    fallback_mode: dsx_core::types::PermissionMode,
-    allow_wide_scope: bool,
-    id: String,
-) -> anyhow::Result<()> {
-    let db_path = project_root.join(".dsx").join("sessions.db");
-    let pool = match dsx_memory::open(&db_path).await {
-        Ok(pool) => pool,
-        Err(e) => {
-            println!("Error: Failed to open sessions database: {e}");
-            return Ok(());
-        }
-    };
-    let sm = dsx_session::SessionManager::new(pool.clone());
-    match sm.get(&id).await {
-        Ok(Some(session)) => {
-            let mode =
-                dsx_core::types::PermissionMode::parse(&session.mode).unwrap_or(fallback_mode);
-            println!("Resuming session {}...", session.id);
-            tui_runner::run_tui(
-                project_root,
-                api_key,
-                api_base,
-                mode,
-                allow_wide_scope,
-                Some(session.id),
-                Some(pool),
-            )
-            .await?;
-        }
-        _ => println!("Error: Session with ID '{}' not found.", id),
     }
     Ok(())
 }

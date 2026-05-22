@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-const LINE_LIMIT: usize = 300;
 const STALE_MINUTES: i64 = 60;
 
 pub(crate) struct WorkspaceAudit {
@@ -47,10 +46,11 @@ pub(crate) async fn collect_workspace_audit(
 ) -> anyhow::Result<WorkspaceAudit> {
     let runs = crate::workspace_runs::collect_agent_runs(project_root, limit, all).await?;
     let notes = crate::workspace_notes::collect_workspace_notes(project_root, limit, all).await?;
-    let line_violations = crate::doctor::rust_line_violations(project_root, LINE_LIMIT)?
-        .into_iter()
-        .map(|item| format!("{}={} lines", item.path.display(), item.lines))
-        .collect::<Vec<_>>();
+    let line_violations =
+        crate::line_limit::rust_line_violations(project_root, crate::line_limit::MAX_RS_LINES)?
+            .into_iter()
+            .map(|item| format!("{}={} lines", item.path.display(), item.lines))
+            .collect::<Vec<_>>();
     let running_runs = crate::workspace_runs::running_run_count(project_root).await?;
     let stale_runs = crate::workspace_stale_runs::stale_run_count(project_root, STALE_MINUTES)
         .await
@@ -183,7 +183,7 @@ fn note_json(note: &AuditNote) -> serde_json::Value {
 
 fn line_status(audit: &WorkspaceAudit) -> String {
     if audit.line_violations.is_empty() {
-        return format!("ok; Rust files <= {LINE_LIMIT}");
+        return format!("ok; Rust files <= {}", crate::line_limit::MAX_RS_LINES);
     }
     format!("fail; {}", audit.line_violations.join(", "))
 }

@@ -1,14 +1,9 @@
 //! Workspace readiness diagnostics.
 
-use std::path::{Path, PathBuf};
-
-const MAX_RS_LINES: usize = 300;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileLineCount {
-    pub path: PathBuf,
-    pub lines: usize,
-}
+use crate::line_limit::{
+    MAX_RS_LINES, PRESSURE_RS_LINES, rust_line_pressure, rust_line_violations,
+};
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CheckStatus {
@@ -156,64 +151,36 @@ fn capsule_parts_ready(parts: &dsx_agent::brief::TaskBriefParts) -> bool {
 
 fn line_limit_check(project_root: &Path) -> Check {
     match rust_line_violations(project_root, MAX_RS_LINES) {
-        Ok(violations) if violations.is_empty() => ok(
-            "line-limit",
-            format!("all Rust files <= {MAX_RS_LINES} lines"),
-        ),
-        Ok(violations) => {
-            let details = violations
-                .iter()
-                .take(5)
-                .map(|item| format!("{}={} lines", item.path.display(), item.lines))
-                .collect::<Vec<_>>()
-                .join(", ");
-            fail("line-limit", details)
-        }
+        Ok(violations) if violations.is_empty() => line_pressure_check(project_root),
+        Ok(violations) => fail("line-limit", format_line_counts(&violations)),
         Err(e) => fail("line-limit", format!("failed to scan Rust files: {e}")),
     }
 }
 
-pub fn rust_line_violations(root: &Path, max_lines: usize) -> anyhow::Result<Vec<FileLineCount>> {
-    let mut out = Vec::new();
-    visit_rust_files(root, root, max_lines, &mut out)?;
-    out.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.path.cmp(&b.path)));
-    Ok(out)
-}
-
-fn visit_rust_files(
-    root: &Path,
-    dir: &Path,
-    max_lines: usize,
-    out: &mut Vec<FileLineCount>,
-) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            if !is_skipped_dir(&path) {
-                visit_rust_files(root, &path, max_lines, out)?;
-            }
-            continue;
-        }
-        if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let lines = std::fs::read_to_string(&path)?.lines().count();
-            if lines > max_lines {
-                out.push(FileLineCount {
-                    path: path.strip_prefix(root).unwrap_or(&path).to_path_buf(),
-                    lines,
-                });
-            }
-        }
+fn line_pressure_check(project_root: &Path) -> Check {
+    match rust_line_pressure(project_root, PRESSURE_RS_LINES, MAX_RS_LINES) {
+        Ok(files) if files.is_empty() => ok(
+            "line-limit",
+            format!("all Rust files <= {MAX_RS_LINES} lines"),
+        ),
+        Ok(files) => warn(
+            "line-limit",
+            format!(
+                "all Rust files <= {MAX_RS_LINES}; near limit: {}",
+                format_line_counts(&files)
+            ),
+        ),
+        Err(e) => fail("line-limit", format!("failed to scan Rust files: {e}")),
     }
-    Ok(())
 }
 
-fn is_skipped_dir(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
-    matches!(name, ".git" | ".dsx" | "target")
+fn format_line_counts(files: &[crate::line_limit::FileLineCount]) -> String {
+    files
+        .iter()
+        .take(5)
+        .map(|item| format!("{}={} lines", item.path.display(), item.lines))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn ok(name: &'static str, detail: impl Into<String>) -> Check {
@@ -247,6 +214,7 @@ fn marker(status: CheckStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn detects_rust_files_over_line_limit() {
@@ -257,11 +225,29 @@ mod tests {
         std::fs::create_dir_all(root.join("target/debug")).unwrap();
         std::fs::write(root.join("target/debug/ignored.rs"), "x\n".repeat(10)).unwrap();
 
-        let violations = rust_line_violations(&root, 3).unwrap();
+        let violations = crate::line_limit::rust_line_violations(&root, 3).unwrap();
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].path, PathBuf::from("src/too_long.rs"));
         assert_eq!(violations[0].lines, 4);
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn warns_on_rust_files_near_line_limit() {
+        let root = temp_root("dsx_doctor_line_pressure");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("src/almost.rs"),
+            "x\n".repeat(crate::line_limit::PRESSURE_RS_LINES),
+        )
+        .unwrap();
+
+        let check = line_limit_check(&root);
+
+        assert_eq!(check.status, CheckStatus::Warn);
+        assert!(check.detail.contains("near limit"));
 
         let _ = std::fs::remove_dir_all(root);
     }
