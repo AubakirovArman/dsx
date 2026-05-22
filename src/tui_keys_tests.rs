@@ -86,7 +86,46 @@ mod tests {
         );
     }
 
+    #[test]
+    fn context_enter_drafts_scoped_task_for_focused_folder() {
+        let root = temp_root("dsx_context_draft");
+        let scoped = root.join("1234");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&scoped).unwrap();
+        let app = Arc::new(Mutex::new(dsx_tui::App::new()));
+        {
+            let mut app = app.lock().unwrap();
+            app.show_context = true;
+            app.scope_lock.launch_scope = root.display().to_string();
+            app.upsert_folder_note(&scoped.display().to_string(), "state", "next");
+        }
+
+        handle_context_key(key(KeyCode::Enter), &app);
+        let app = app.lock().unwrap();
+        let scope = dsx_agent::scope::resolve_task_scope(&root, &app.input).unwrap();
+
+        assert_eq!(app.input, "use folder 1234 only: ");
+        assert_eq!(scope.active_root, scoped.canonicalize().unwrap());
+        assert_eq!(app.cursor_pos, app.input.chars().count());
+        assert!(!app.show_context);
+        assert!(
+            app.messages
+                .iter()
+                .any(|msg| msg.content.contains(&scoped.display().to_string()))
+        );
+        drop(app);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn temp_root(name: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("{name}_{nanos}"))
     }
 }
