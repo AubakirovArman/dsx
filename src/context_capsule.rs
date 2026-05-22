@@ -97,6 +97,10 @@ fn print_capsule(capsule: &ContextCapsule) {
         "  Active exists: {}",
         if capsule.active_exists { "yes" } else { "no" }
     );
+    println!("  Scope contract: tools locked to active scope");
+    if !capsule.narrowed {
+        println!("  Scope warning: workspace-wide until a child folder is selected");
+    }
     println!(
         "  Capsule estimate: ~{} token(s), {} folder note(s)",
         capsule.metrics.estimated_capsule_tokens, capsule.metrics.folder_note_count
@@ -132,6 +136,15 @@ pub(crate) fn capsule_json(capsule: &ContextCapsule) -> serde_json::Value {
         "active_scope": capsule.active_scope,
         "narrowed": capsule.narrowed,
         "active_exists": capsule.active_exists,
+        "scope_contract": {
+            "launch_scope": capsule.launch_scope,
+            "active_scope": capsule.active_scope,
+            "tool_root": capsule.active_scope,
+            "status": if capsule.narrowed { "narrowed" } else { "wide" },
+            "active_exists": capsule.active_exists,
+            "rule": "read/write/commands are locked to active_scope",
+            "warning": if capsule.narrowed { "" } else { "workspace-wide until a child folder is selected" },
+        },
         "task_state": capsule.task_state,
         "folder_notes": crate::workspace_notes::notes_json_value(&capsule.folder_notes),
         "metrics": {

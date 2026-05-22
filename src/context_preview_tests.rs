@@ -24,6 +24,10 @@ mod tests {
         );
         assert!(preview.project_context.contains("Cargo.toml"));
         assert!(preview.task_brief.contains("Active scope:"));
+        let value = preview_json(&preview);
+        assert_eq!(value["scope_contract"]["status"], "narrowed");
+        assert_eq!(value["scope_contract"]["tool_root"], preview.active_scope);
+        assert_eq!(value["scope_contract"]["warning"], "");
 
         let _ = std::fs::remove_dir_all(root);
     }
@@ -59,6 +63,17 @@ mod tests {
         assert_eq!(
             value["active_scope"],
             root.canonicalize().unwrap().display().to_string()
+        );
+        assert_eq!(value["scope_contract"]["status"], "wide");
+        assert_eq!(
+            value["scope_contract"]["tool_root"],
+            root.canonicalize().unwrap().display().to_string()
+        );
+        assert!(
+            value["scope_contract"]["warning"]
+                .as_str()
+                .unwrap()
+                .contains("workspace-wide")
         );
         assert!(value["task_brief"].as_str().unwrap().contains("Goal:"));
         assert!(

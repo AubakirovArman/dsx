@@ -123,6 +123,10 @@ fn print_preview(preview: &ContextPreview, show_budget_advice: bool) {
         "  Active exists: {}",
         if preview.active_exists { "yes" } else { "no" }
     );
+    println!("  Scope contract: tools locked to active scope");
+    if !preview.narrowed {
+        println!("  Scope warning: workspace-wide until a child folder is selected");
+    }
     println!(
         "  Request estimate: {} tokens / {} ({})",
         preview.metrics.estimated_request_tokens,
@@ -161,6 +165,15 @@ pub(crate) fn preview_json(preview: &ContextPreview) -> serde_json::Value {
         "active_scope": preview.active_scope,
         "narrowed": preview.narrowed,
         "active_exists": preview.active_exists,
+        "scope_contract": {
+            "launch_scope": preview.launch_scope,
+            "active_scope": preview.active_scope,
+            "tool_root": preview.active_scope,
+            "status": if preview.narrowed { "narrowed" } else { "wide" },
+            "active_exists": preview.active_exists,
+            "rule": "read/write/commands are locked to active_scope",
+            "warning": if preview.narrowed { "" } else { "workspace-wide until a child folder is selected" },
+        },
         "system_note": preview.system_note,
         "task_brief": preview.task_brief,
         "context_capsule": dsx_agent::prompt::context_capsule(&preview.task_brief),

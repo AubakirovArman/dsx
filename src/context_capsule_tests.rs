@@ -27,6 +27,10 @@ mod tests {
         assert!(capsule.task_state.constraints.contains("300 lines"));
         assert!(capsule.folder_notes.iter().any(|note| note.label == "1234"));
         assert!(capsule.metrics.estimated_capsule_tokens > 0);
+        let value = capsule_json(&capsule);
+        assert_eq!(value["scope_contract"]["status"], "narrowed");
+        assert_eq!(value["scope_contract"]["tool_root"], capsule.active_scope);
+        assert_eq!(value["scope_contract"]["warning"], "");
 
         let _ = std::fs::remove_dir_all(root);
     }
@@ -46,6 +50,17 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("300 lines")
+        );
+        assert_eq!(value["scope_contract"]["status"], "wide");
+        assert_eq!(
+            value["scope_contract"]["tool_root"],
+            root.canonicalize().unwrap().display().to_string()
+        );
+        assert!(
+            value["scope_contract"]["rule"]
+                .as_str()
+                .unwrap()
+                .contains("active_scope")
         );
         assert!(value["folder_notes"].is_array());
         assert!(
