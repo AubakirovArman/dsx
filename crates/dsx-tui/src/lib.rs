@@ -10,6 +10,7 @@ pub mod draw_settings;
 pub mod draw_status;
 pub mod draw_tools;
 pub mod draw_workflow;
+pub mod draw_workflow_panels;
 pub mod folder_notes;
 pub mod i18n;
 pub mod stream_events;
