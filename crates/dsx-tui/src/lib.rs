@@ -9,6 +9,7 @@ pub mod draw_input;
 pub mod draw_mission;
 pub mod draw_mission_state;
 pub mod draw_panes;
+pub mod draw_run_ledger;
 pub mod draw_settings;
 pub mod draw_status;
 pub mod draw_tools;
@@ -20,8 +21,8 @@ pub mod stream_events;
 pub mod types;
 
 pub use types::{
-    AgentStreamEvent, AgentTask, ChatMessage, FolderNote, Language, PendingApproval,
-    ScopeLockPanel, TaskBriefPanel, ToolTimelineEntry,
+    AgentStreamEvent, AgentTask, ChatMessage, FolderNote, Language, PendingApproval, RunLedgerItem,
+    RunLedgerPanel, ScopeLockPanel, TaskBriefPanel, ToolTimelineEntry,
 };
 
 /// Shared app state.
@@ -65,6 +66,7 @@ pub struct App {
     pub scope_lock: ScopeLockPanel,
     pub folder_notes: Vec<FolderNote>,
     pub folder_note_cursor: usize,
+    pub run_ledger: RunLedgerPanel,
     pub tool_timeline: Vec<ToolTimelineEntry>,
     pub allow_wide_scope: bool,
 }
@@ -130,6 +132,7 @@ impl App {
             scope_lock: ScopeLockPanel::default(),
             folder_notes: Vec::new(),
             folder_note_cursor: 0,
+            run_ledger: RunLedgerPanel::default(),
             tool_timeline: Vec::new(),
             allow_wide_scope: false,
         }

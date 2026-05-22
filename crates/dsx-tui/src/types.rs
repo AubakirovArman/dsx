@@ -96,6 +96,29 @@ pub struct FolderNote {
     pub architecture: String,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct RunLedgerPanel {
+    pub total: usize,
+    pub running: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    pub stale: i64,
+    pub total_tokens: i64,
+    pub estimated_tokens_saved: i64,
+    pub scope_violations: i64,
+    pub recent: Vec<RunLedgerItem>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunLedgerItem {
+    pub id: String,
+    pub status: String,
+    pub scope: String,
+    pub task: String,
+    pub total_tokens: i64,
+    pub scope_violations: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ToolTimelineEntry {
     pub name: String,

@@ -38,6 +38,7 @@ pub mod tui_keys;
 mod tui_keys_tests;
 pub mod tui_modal_keys;
 pub mod tui_preflight;
+pub mod tui_run_health;
 pub mod tui_run_ledger;
 pub mod tui_runner;
 pub mod tui_scope_guard;

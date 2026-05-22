@@ -5,6 +5,7 @@ use crate::draw_mission_state::{
     empty_as, mission_tool_counts, scope_color, scope_guard_text, scope_status, task_state,
     tool_status_color,
 };
+use crate::draw_run_ledger::append_run_ledger_lines;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -117,6 +118,8 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
         &scope_guard_text(app),
         scope_color(app),
     );
+    lines.push(Line::from(""));
+    append_run_ledger_lines(app, &mut lines, 4);
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
         "Recent tools",

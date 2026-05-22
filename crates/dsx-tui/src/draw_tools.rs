@@ -1,6 +1,7 @@
 //! Dedicated tool timeline view.
 
 use crate::App;
+use crate::draw_run_ledger::append_run_ledger_lines;
 use ratatui::{
     Frame,
     layout::Rect,
@@ -29,6 +30,8 @@ impl App {
             ]),
             Line::from(""),
         ];
+        append_run_ledger_lines(self, &mut lines, 6);
+        lines.push(Line::from(""));
         if self.compaction_events > 0 {
             lines.push(compaction_line(self));
             lines.push(Line::from(""));

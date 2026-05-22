@@ -89,6 +89,9 @@ mod tests {
                 .any(|message| message.content.contains("Workspace audit:"))
         );
         assert!(app.scope_lock.warning.contains("scope escape"));
+        assert_eq!(app.run_ledger.total, 1);
+        assert_eq!(app.run_ledger.scope_violations, 2);
+        assert_eq!(app.run_ledger.recent[0].scope, "1234");
 
         let _ = std::fs::remove_dir_all(root);
     }

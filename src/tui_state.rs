@@ -149,6 +149,7 @@ fn load_history_event(app: &mut dsx_tui::App, event: &dsx_session::Event) {
 fn apply_startup_audit(app: &SharedApp, audit: crate::workspace_audit::WorkspaceAudit) {
     let mut app = app.lock().unwrap();
     app.add_message("system", &startup_audit_line(&audit));
+    app.run_ledger = crate::tui_run_health::panel_from_audit(&audit);
     let warning = startup_audit_warning(&audit);
     if !warning.is_empty() {
         app.scope_lock.warning = warning;

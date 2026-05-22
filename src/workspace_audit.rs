@@ -22,6 +22,10 @@ pub(crate) struct AuditRun {
     pub(crate) scope: String,
     pub(crate) contract: String,
     pub(crate) task: String,
+    pub(crate) total_tokens: i64,
+    pub(crate) estimated_cost_usd: f64,
+    pub(crate) compaction_events: i64,
+    pub(crate) estimated_tokens_saved: i64,
     pub(crate) scope_violations: i64,
 }
 
@@ -104,6 +108,10 @@ fn audit_run(project_root: &Path, located: &crate::workspace_runs::LocatedRun) -
             run.scope_status
         ),
         task: crate::handlers::task_preview(&run.task_excerpt),
+        total_tokens: run.total_tokens,
+        estimated_cost_usd: run.estimated_cost_usd,
+        compaction_events: run.compaction_events,
+        estimated_tokens_saved: run.estimated_tokens_saved,
         scope_violations: run.scope_violations,
     }
 }
@@ -179,6 +187,10 @@ fn run_json(run: &AuditRun) -> serde_json::Value {
         "scope": run.scope,
         "contract": run.contract,
         "task": run.task,
+        "total_tokens": run.total_tokens,
+        "estimated_cost_usd": run.estimated_cost_usd,
+        "compaction_events": run.compaction_events,
+        "estimated_tokens_saved": run.estimated_tokens_saved,
         "scope_violations": run.scope_violations,
     })
 }

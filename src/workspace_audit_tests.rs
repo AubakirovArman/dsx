@@ -18,6 +18,8 @@ async fn audit_surfaces_scope_contracts_and_notes() {
     assert_eq!(value["line_limit"]["ok"], true);
     assert!(value["line_limit"]["pressure"].is_array());
     assert_eq!(value["runs"][0]["scope"], "1234");
+    assert_eq!(value["runs"][0]["total_tokens"], 7);
+    assert_eq!(value["runs"][0]["estimated_tokens_saved"], 120);
 
     let _ = std::fs::remove_dir_all(root);
 }
@@ -72,6 +74,8 @@ async fn seed_run(child: &Path, root: &Path) {
         &id,
         &dsx_memory::AgentRunUpdate {
             status: "completed".into(),
+            prompt_tokens: 7,
+            estimated_tokens_saved: 120,
             scope_violations: 1,
             ..Default::default()
         },
