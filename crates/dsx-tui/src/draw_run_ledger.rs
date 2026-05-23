@@ -52,7 +52,7 @@ fn append_recent_runs(
     if recent.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  No saved agent runs yet.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Cyan),
         )]));
         return;
     }
