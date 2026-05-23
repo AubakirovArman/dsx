@@ -67,7 +67,7 @@ impl App {
         let paragraph = Paragraph::new(Text::from(lines)).block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
+                .border_type(BorderType::Thick)
                 .border_style(Style::default().fg(Color::Cyan))
                 .title(Span::styled(
                     tr(self.lang, "settings_title"),
@@ -90,7 +90,7 @@ impl App {
             chip(value.to_string(), Color::White),
             Span::styled(
                 format!("   {}", setting_hint(self.lang, idx)),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Cyan),
             ),
         ]));
         lines.push(Line::from(""));

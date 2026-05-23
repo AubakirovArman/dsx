@@ -34,7 +34,7 @@ impl App {
         if self.folder_notes.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "No folder summaries yet.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Cyan),
             )]));
         } else {
             let focused = self.focused_folder_note_index().unwrap_or(0);
@@ -92,7 +92,7 @@ impl App {
         if self.tool_timeline.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "No tool calls in this task yet.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Cyan),
             )]));
         } else {
             for entry in self.tool_timeline.iter().rev().take(8).rev() {
@@ -165,7 +165,7 @@ impl App {
 fn panel_block<'a>(title: &'a str, border: Color, title_color: Color) -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(Style::default().fg(border))
         .title(Span::styled(
             title,

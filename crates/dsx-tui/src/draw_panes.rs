@@ -30,7 +30,7 @@ impl App {
             items.push(ListItem::new(Line::from(Span::styled(
                 format!("  ... (+{} more files)", remaining),
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(Color::Cyan)
                     .add_modifier(Modifier::ITALIC),
             ))));
         }
@@ -39,8 +39,8 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(Color::DarkGray))
+                    .border_type(BorderType::Thick)
+                    .border_style(Style::default().fg(Color::Cyan))
                     .title(Span::styled(
                         tr(self.lang, "sidebar_title"),
                         Style::default()
@@ -71,7 +71,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::LightMagenta))
                     .title(Span::styled(
                         tr(self.lang, "reasoning_title"),
@@ -90,7 +90,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::Yellow))
                     .title(Span::styled(
                         tr(self.lang, "diff_title"),
@@ -115,7 +115,7 @@ fn file_style(path: &str) -> Style {
     } else if path.ends_with(".toml") || path.ends_with(".md") {
         Style::default().fg(Color::Cyan)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(Color::Green)
     }
 }
 
@@ -126,7 +126,7 @@ fn reasoning_lines(app: &App) -> Vec<Line<'_>> {
             Line::from(vec![Span::styled(
                 line,
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(Color::Cyan)
                     .add_modifier(Modifier::ITALIC),
             )])
         })
@@ -153,7 +153,7 @@ fn reasoning_placeholder(lang: crate::types::Language) -> Vec<Line<'static>> {
                 crate::types::Language::Chinese => "  ⌛ 正在排队并处理提示词上下文...",
                 crate::types::Language::English => "  ⌛ Processing prompt & queuing...",
             },
-            Color::DarkGray,
+            Color::Cyan,
             false,
         ),
         placeholder_line(
@@ -163,7 +163,7 @@ fn reasoning_placeholder(lang: crate::types::Language) -> Vec<Line<'static>> {
                 crate::types::Language::Chinese => "  ⚡ 请稍后 (v4-pro)...",
                 crate::types::Language::English => "  ⚡ Please wait (v4-pro)...",
             },
-            Color::DarkGray,
+            Color::Cyan,
             false,
         ),
     ]
@@ -224,7 +224,7 @@ fn diff_style(line: &str) -> Style {
     } else if line.starts_with("@@") {
         Style::default().fg(Color::Cyan)
     } else if line.starts_with("diff") || line.starts_with("index") {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(Color::Cyan)
     } else {
         Style::default().fg(Color::White)
     }

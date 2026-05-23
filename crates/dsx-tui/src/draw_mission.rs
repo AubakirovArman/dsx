@@ -135,7 +135,7 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
     if app.tool_timeline.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  No tool calls in this task yet.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Cyan),
         )]));
     } else {
         for entry in app.tool_timeline.iter().rev().take(8).rev() {
@@ -191,7 +191,7 @@ fn push_inline(lines: &mut Vec<Line<'static>>, title: &'static str, value: &str,
 fn block(title: &'static str, color: Color) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(Style::default().fg(color))
         .title(Span::styled(
             title,

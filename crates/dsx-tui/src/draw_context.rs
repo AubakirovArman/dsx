@@ -25,7 +25,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::LightCyan))
                     .title(Span::styled(
                         " Context Capsule ",
@@ -91,7 +91,7 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
     if app.folder_notes.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  none loaded",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::LightBlue),
         )]));
         return;
     }

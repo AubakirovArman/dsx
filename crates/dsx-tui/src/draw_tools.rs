@@ -39,7 +39,7 @@ impl App {
         if self.tool_timeline.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "No tool calls in this task yet.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Cyan),
             )]));
         } else {
             append_tools(self, &mut lines);
@@ -49,7 +49,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::Yellow))
                     .title(Span::styled(
                         " Tools / Scope Guard ",
@@ -70,7 +70,7 @@ fn append_tools(app: &App, lines: &mut Vec<Line<'static>>) {
         lines.push(Line::from(vec![
             Span::styled(
                 format!("{:02} ", idx + 1),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Cyan),
             ),
             Span::styled(
                 format!("{:<7}", entry.status),
