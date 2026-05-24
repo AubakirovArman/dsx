@@ -95,7 +95,7 @@ impl App {
 
         spans.extend([key("Ctrl+C"), plain(tr(self.lang, "status_quit"))]);
         let status_bar = Paragraph::new(Line::from(spans))
-            .style(Style::default().bg(Color::Black).fg(Color::Gray));
+            .style(Style::default().bg(Color::Black).fg(Color::DarkGray));
         frame.render_widget(status_bar, area);
     }
 }
