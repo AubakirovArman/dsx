@@ -30,7 +30,7 @@ impl App {
             let (prompt, title, style) = input_state(self);
             Paragraph::new(prompt)
                 .block(input_block(title, style))
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(Color::Cyan))
                 .wrap(Wrap { trim: false })
         };
 
@@ -93,7 +93,7 @@ fn running_label(lang: Language, desc: &str) -> String {
 fn input_block(title: &'static str, style: Style) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(style)
         .title(Span::styled(title, style.add_modifier(Modifier::BOLD)))
 }

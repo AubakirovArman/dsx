@@ -1,0 +1,51 @@
+<<<<<<< SEARCH
+            ToolSpec {
+                name: "mcp_call".into(),
+                description: "Call a tool on a configured MCP server with a JSON object of arguments.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {"type": "string", "description": "Configured MCP server name"},
+                        "tool": {"type": "string", "description": "Tool name exposed by the MCP server"},
+                        "arguments": {"type": "object", "description": "Tool arguments matching the MCP input schema"}
+                    },
+                    "required": ["server", "tool", "arguments"]
+                }),
+                risk: RiskLevel::Medium,
+            },
+        ]
+    }
+}
+=======
+            ToolSpec {
+                name: "mcp_call".into(),
+                description: "Call a tool on a configured MCP server with a JSON object of arguments.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {"type": "string", "description": "Configured MCP server name"},
+                        "tool": {"type": "string", "description": "Tool name exposed by the MCP server"},
+                        "arguments": {"type": "object", "description": "Tool arguments matching the MCP input schema"}
+                    },
+                    "required": ["server", "tool", "arguments"]
+                }),
+                risk: RiskLevel::Medium,
+            },
+            ToolSpec {
+                name: "save_memory".into(),
+                description: "Save a fact or lesson learned about the project for future use. Useful for recording architectural choices, gotchas, or important environment instructions.",
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "scope": {"type": "string", "description": "The scope of the memory, e.g. a specific directory or 'global'"},
+                        "memory_type": {"type": "string", "description": "The category of memory (e.g., 'architecture', 'environment', 'lesson', 'gotcha')"},
+                        "content": {"type": "string", "description": "The actual knowledge or instructions to save"}
+                    },
+                    "required": ["scope", "memory_type", "content"]
+                }),
+                risk: RiskLevel::Read,
+            },
+        ]
+    }
+}
+>>>>>>> REPLACE

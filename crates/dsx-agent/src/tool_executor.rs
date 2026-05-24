@@ -126,6 +126,7 @@ pub async fn execute(call: &ToolCallReady, ctx: &ToolContext) -> ToolResult {
         }
         "mcp_call" => crate::tool_implementations::exec_mcp_call(&call.id, &args, ctx).await,
         "run_command" => crate::tool_implementations::exec_run_command(&call.id, &args, ctx).await,
+        "save_memory" => crate::tool_implementations::exec_save_memory(&call.id, &args, ctx),
         name => ToolResult {
             tool_call_id: call.id.clone(),
             name: name.into(),

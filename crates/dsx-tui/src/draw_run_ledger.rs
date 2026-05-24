@@ -29,7 +29,7 @@ pub(crate) fn append_run_ledger_lines(
         Span::raw("  "),
         Span::styled(
             run_ledger_summary_text(app),
-            Style::default().fg(Color::White),
+            Style::default().fg(Color::Cyan),
         ),
     ]));
     if app.run_ledger.estimated_tokens_saved > 0 {
@@ -37,7 +37,7 @@ pub(crate) fn append_run_ledger_lines(
             Span::raw("  compact saved "),
             Span::styled(
                 format!("~{} tok", app.run_ledger.estimated_tokens_saved),
-                Style::default().fg(Color::Gray),
+                Style::default().fg(Color::DarkGray),
             ),
         ]));
     }
@@ -74,7 +74,7 @@ fn append_recent_runs(
             Span::raw("    "),
             Span::styled(
                 format!("{} {}", run.id, truncate(&run.task, 82)),
-                Style::default().fg(Color::Gray),
+                Style::default().fg(Color::DarkGray),
             ),
         ]));
     }
@@ -85,7 +85,7 @@ fn status_color(status: &str) -> Color {
         "completed" => Color::LightGreen,
         "running" => Color::LightYellow,
         "failed" | "cancelled" => Color::LightRed,
-        _ => Color::White,
+        _ => Color::Cyan,
     }
 }
 

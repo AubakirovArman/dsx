@@ -73,7 +73,7 @@ fn task_panel(app: &App) -> Paragraph<'static> {
     let mut lines = Vec::new();
     push_section(&mut lines, "Goal", &b.goal, Color::LightCyan, 4);
     push_section(&mut lines, "Done", &b.done, Color::LightGreen, 4);
-    push_section(&mut lines, "Plan", &b.plan, Color::White, 6);
+    push_section(&mut lines, "Plan", &b.plan, Color::Cyan, 6);
     push_section(&mut lines, "Last", &b.last_changes, Color::Yellow, 4);
     push_section(&mut lines, "Next", &b.next_step, Color::LightMagenta, 3);
     push_section(
@@ -94,7 +94,7 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
         &mut lines,
         "Launch",
         &app.scope_lock.launch_scope,
-        Color::Gray,
+        Color::DarkGray,
     );
     push_inline(
         &mut lines,
@@ -108,7 +108,7 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
         &app.scope_lock.status,
         scope_color(app),
     );
-    push_inline(&mut lines, "Reason", &app.scope_lock.reason, Color::White);
+    push_inline(&mut lines, "Reason", &app.scope_lock.reason, Color::Cyan);
     if !app.scope_lock.warning.trim().is_empty() {
         push_inline(
             &mut lines,
@@ -150,7 +150,7 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
             ]));
             lines.push(Line::from(vec![
                 Span::raw("    "),
-                Span::styled(entry.summary.clone(), Style::default().fg(Color::Gray)),
+                Span::styled(entry.summary.clone(), Style::default().fg(Color::DarkGray)),
             ]));
         }
     }
@@ -173,7 +173,7 @@ fn push_section(
     for line in value.lines().take(limit) {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(line.to_string(), Style::default().fg(Color::White)),
+            Span::styled(line.to_string(), Style::default().fg(Color::Cyan)),
         ]));
     }
 }
@@ -184,14 +184,14 @@ fn push_inline(lines: &mut Vec<Line<'static>>, title: &'static str, value: &str,
             format!("{title}: "),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(empty_as(value, "none"), Style::default().fg(Color::White)),
+        Span::styled(empty_as(value, "none"), Style::default().fg(Color::Cyan)),
     ]));
 }
 
 fn block(title: &'static str, color: Color) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(Style::default().fg(color))
         .title(Span::styled(
             title,
@@ -209,7 +209,7 @@ fn label(text: &'static str) -> Span<'static> {
 }
 
 fn value(text: impl Into<String>) -> Span<'static> {
-    Span::styled(text.into(), Style::default().fg(Color::White))
+    Span::styled(text.into(), Style::default().fg(Color::Cyan))
 }
 
 fn gap() -> Span<'static> {

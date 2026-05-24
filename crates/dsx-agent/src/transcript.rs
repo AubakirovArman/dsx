@@ -5,8 +5,8 @@ use crate::types::ToolResult;
 use dsx_provider::types::Message;
 
 const SUMMARY_PREFIX: &str = "Rolling transcript summary:";
-const COMPACT_AFTER_MESSAGES: usize = 18;
-const RECENT_MESSAGE_WINDOW: usize = 8;
+const COMPACT_AFTER_MESSAGES: usize = 10;
+const RECENT_MESSAGE_WINDOW: usize = 4;
 const TASK_STATE_CAPSULE_CHARS: usize = 2_400;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,7 +144,7 @@ mod tests {
 
         let stats = compact_messages(&mut messages, &tools).unwrap();
 
-        assert_eq!(stats.removed_messages, 16);
+        assert_eq!(stats.removed_messages, 20);
         assert_eq!(stats.retained_messages, messages.len());
         assert_eq!(messages[0].role, "system");
         assert!(

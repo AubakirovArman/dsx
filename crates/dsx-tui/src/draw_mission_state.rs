@@ -61,7 +61,7 @@ pub(crate) fn tool_status_color(status: &str) -> Color {
     match status {
         "ok" => Color::LightGreen,
         "failed" | "blocked" => Color::LightRed,
-        _ => Color::White,
+        _ => Color::Cyan,
     }
 }
 

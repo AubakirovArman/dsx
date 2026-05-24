@@ -126,6 +126,20 @@ impl ToolRegistry {
                 }),
                 risk: RiskLevel::Medium,
             },
+            ToolSpec {
+                name: "save_memory".into(),
+                description: "Save a fact or lesson learned about the project for future use. Useful for recording architectural choices, gotchas, or important environment instructions.".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "scope": {"type": "string", "description": "The scope of the memory, e.g. a specific directory or 'global'"},
+                        "memory_type": {"type": "string", "description": "The category of memory (e.g., 'architecture', 'environment', 'lesson', 'gotcha')"},
+                        "content": {"type": "string", "description": "The actual knowledge or instructions to save"}
+                    },
+                    "required": ["scope", "memory_type", "content"]
+                }),
+                risk: RiskLevel::Read,
+            },
         ]
     }
 }

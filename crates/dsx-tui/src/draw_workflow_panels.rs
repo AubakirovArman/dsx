@@ -15,11 +15,11 @@ impl App {
         let mut lines = Vec::new();
         push_field(&mut lines, "Goal", &b.goal, Color::LightCyan);
         push_field(&mut lines, "Done", &b.done, Color::LightGreen);
-        push_field(&mut lines, "Plan", &b.plan, Color::White);
+        push_field(&mut lines, "Plan", &b.plan, Color::Cyan);
         push_field(&mut lines, "Last", &b.last_changes, Color::Yellow);
         push_field(&mut lines, "Next", &b.next_step, Color::LightMagenta);
         if !b.active_scope.trim().is_empty() {
-            push_field(&mut lines, "Scope", &b.active_scope, Color::Gray);
+            push_field(&mut lines, "Scope", &b.active_scope, Color::DarkGray);
         }
 
         let paragraph = Paragraph::new(Text::from(lines))
@@ -53,11 +53,11 @@ impl App {
                             })
                             .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled(note.summary.as_str(), Style::default().fg(Color::White)),
+                    Span::styled(note.summary.as_str(), Style::default().fg(Color::Cyan)),
                 ]));
                 lines.push(Line::from(vec![
                     Span::raw("  next: "),
-                    Span::styled(note.next_step.as_str(), Style::default().fg(Color::Gray)),
+                    Span::styled(note.next_step.as_str(), Style::default().fg(Color::DarkGray)),
                 ]));
                 lines.push(Line::from(vec![
                     Span::raw("  arch: "),
@@ -85,7 +85,7 @@ impl App {
                         self.compacted_messages,
                         self.estimated_tokens_saved
                     ),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
             ]));
         }
@@ -110,7 +110,7 @@ impl App {
                 ]));
                 lines.push(Line::from(vec![
                     Span::raw("  "),
-                    Span::styled(entry.summary.as_str(), Style::default().fg(Color::Gray)),
+                    Span::styled(entry.summary.as_str(), Style::default().fg(Color::DarkGray)),
                 ]));
             }
         }
@@ -133,9 +133,9 @@ impl App {
         };
         let mut lines = Vec::new();
         push_inline(&mut lines, "Status", &s.status, color);
-        push_inline(&mut lines, "Launch", &s.launch_scope, Color::Gray);
+        push_inline(&mut lines, "Launch", &s.launch_scope, Color::DarkGray);
         push_inline(&mut lines, "Active", &s.active_scope, Color::LightCyan);
-        push_inline(&mut lines, "Why", &s.reason, Color::White);
+        push_inline(&mut lines, "Why", &s.reason, Color::Cyan);
         if self.scope_violations > 0 {
             push_inline(
                 &mut lines,
@@ -165,7 +165,7 @@ impl App {
 fn panel_block<'a>(title: &'a str, border: Color, title_color: Color) -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(Style::default().fg(border))
         .title(Span::styled(
             title,
@@ -183,7 +183,7 @@ fn push_field(lines: &mut Vec<Line<'_>>, label: &'static str, value: &str, color
     for line in value.lines().take(4) {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(line.to_string(), Style::default().fg(Color::White)),
+            Span::styled(line.to_string(), Style::default().fg(Color::Cyan)),
         ]));
     }
 }
@@ -194,6 +194,6 @@ fn push_inline(lines: &mut Vec<Line<'_>>, label: &'static str, value: &str, colo
             format!("{label}: "),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(value.to_string(), Style::default().fg(Color::White)),
+        Span::styled(value.to_string(), Style::default().fg(Color::Cyan)),
     ]));
 }
