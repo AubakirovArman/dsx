@@ -48,8 +48,9 @@ impl App {
         let paragraph = Paragraph::new(Text::from(lines))
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::Yellow))
                     .title(Span::styled(
                         " Tools / Scope Guard ",

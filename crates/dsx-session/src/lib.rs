@@ -175,14 +175,12 @@ impl SessionManager {
     /// Update the project root of an active session.
     pub async fn update_project_root(&self, id: &str, project_root: &str) -> anyhow::Result<()> {
         let now = Utc::now().to_rfc3339();
-        sqlx::query(
-            "UPDATE sessions SET project_root = ?, updated_at = ? WHERE id = ?"
-        )
-        .bind(project_root)
-        .bind(&now)
-        .bind(id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE sessions SET project_root = ?, updated_at = ? WHERE id = ?")
+            .bind(project_root)
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }

@@ -52,8 +52,9 @@ impl App {
         let paragraph = Paragraph::new(Text::from(visible_lines))
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::Green))
                     .title(Span::styled(
                         tr(self.lang, "chat_title"),
