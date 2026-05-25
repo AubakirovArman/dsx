@@ -38,8 +38,9 @@ impl App {
         let list = List::new(items)
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::DarkGray))
                     .title(Span::styled(
                         tr(self.lang, "sidebar_title"),
@@ -70,8 +71,9 @@ impl App {
         let paragraph = Paragraph::new(Text::from(visible_lines))
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::LightMagenta))
                     .title(Span::styled(
                         tr(self.lang, "reasoning_title"),
@@ -89,8 +91,9 @@ impl App {
         let paragraph = Paragraph::new(Text::from(diff_lines(self)))
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::Yellow))
                     .title(Span::styled(
                         tr(self.lang, "diff_title"),

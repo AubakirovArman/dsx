@@ -92,8 +92,9 @@ fn running_label(lang: Language, desc: &str) -> String {
 
 fn input_block(title: &'static str, style: Style) -> Block<'static> {
     Block::default()
+        .style(Style::default().bg(Color::Black))
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(style)
         .title(Span::styled(title, style.add_modifier(Modifier::BOLD)))
 }

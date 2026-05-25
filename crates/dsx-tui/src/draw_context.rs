@@ -24,8 +24,9 @@ impl App {
         let paragraph = Paragraph::new(Text::from(lines))
             .block(
                 Block::default()
+                    .style(Style::default().bg(Color::Black))
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::LightCyan))
                     .title(Span::styled(
                         " Context Capsule ",
