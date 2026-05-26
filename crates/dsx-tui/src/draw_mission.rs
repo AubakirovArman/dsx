@@ -72,19 +72,19 @@ fn task_panel(app: &App) -> Paragraph<'static> {
     let b = &app.task_brief;
     let mut lines = Vec::new();
     push_section(&mut lines, "Goal", &b.goal, Color::LightCyan, 4);
-    push_section(&mut lines, "Done", &b.done, Color::LightGreen, 4);
-    push_section(&mut lines, "Plan", &b.plan, Color::White, 6);
-    push_section(&mut lines, "Last", &b.last_changes, Color::Yellow, 4);
-    push_section(&mut lines, "Next", &b.next_step, Color::LightMagenta, 3);
+    push_section(&mut lines, "Done", &b.done, Color::LightCyan, 4);
+    push_section(&mut lines, "Plan", &b.plan, Color::LightCyan, 6);
+    push_section(&mut lines, "Last", &b.last_changes, Color::Magenta, 4);
+    push_section(&mut lines, "Next", &b.next_step, Color::Magenta, 3);
     push_section(
         &mut lines,
         "Architecture",
         &b.architecture,
-        Color::LightBlue,
+        Color::Cyan,
         4,
     );
     Paragraph::new(Text::from(lines))
-        .block(block(" Goal / Done / Plan ", Color::Cyan))
+        .block(block(" Goal / Done / Plan ", Color::LightCyan))
         .wrap(Wrap { trim: false })
 }
 
@@ -94,7 +94,7 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
         &mut lines,
         "Launch",
         &app.scope_lock.launch_scope,
-        Color::Gray,
+        Color::Cyan,
     );
     push_inline(
         &mut lines,
@@ -108,13 +108,13 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
         &app.scope_lock.status,
         scope_color(app),
     );
-    push_inline(&mut lines, "Reason", &app.scope_lock.reason, Color::White);
+    push_inline(&mut lines, "Reason", &app.scope_lock.reason, Color::LightCyan);
     if !app.scope_lock.warning.trim().is_empty() {
         push_inline(
             &mut lines,
             "Warning",
             &app.scope_lock.warning,
-            Color::Yellow,
+            Color::Magenta,
         );
     }
     push_inline(
@@ -129,13 +129,13 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
     lines.push(Line::from(vec![Span::styled(
         "Recent tools",
         Style::default()
-            .fg(Color::LightYellow)
+            .fg(Color::Magenta)
             .add_modifier(Modifier::BOLD),
     )]));
     if app.tool_timeline.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  No tool calls in this task yet.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Cyan),
         )]));
     } else {
         for entry in app.tool_timeline.iter().rev().take(8).rev() {
@@ -146,16 +146,16 @@ fn ops_panel(app: &App) -> Paragraph<'static> {
                     Style::default().fg(color).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
-                Span::styled(entry.name.clone(), Style::default().fg(Color::LightYellow)),
+                Span::styled(entry.name.clone(), Style::default().fg(Color::Magenta)),
             ]));
             lines.push(Line::from(vec![
                 Span::raw("    "),
-                Span::styled(entry.summary.clone(), Style::default().fg(Color::Gray)),
+                Span::styled(entry.summary.clone(), Style::default().fg(Color::Cyan)),
             ]));
         }
     }
     Paragraph::new(Text::from(lines))
-        .block(block(" Scope / Tools ", Color::Yellow))
+        .block(block(" Scope / Tools ", Color::Magenta))
         .wrap(Wrap { trim: false })
 }
 
@@ -173,7 +173,7 @@ fn push_section(
     for line in value.lines().take(limit) {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(line.to_string(), Style::default().fg(Color::White)),
+            Span::styled(line.to_string(), Style::default().fg(Color::LightCyan)),
         ]));
     }
 }
@@ -184,14 +184,14 @@ fn push_inline(lines: &mut Vec<Line<'static>>, title: &'static str, value: &str,
             format!("{title}: "),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(empty_as(value, "none"), Style::default().fg(Color::White)),
+        Span::styled(empty_as(value, "none"), Style::default().fg(Color::LightCyan)),
     ]));
 }
 
 fn block(title: &'static str, color: Color) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(Style::default().fg(color))
         .title(Span::styled(
             title,
@@ -209,7 +209,7 @@ fn label(text: &'static str) -> Span<'static> {
 }
 
 fn value(text: impl Into<String>) -> Span<'static> {
-    Span::styled(text.into(), Style::default().fg(Color::White))
+    Span::styled(text.into(), Style::default().fg(Color::LightCyan))
 }
 
 fn gap() -> Span<'static> {
