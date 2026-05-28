@@ -18,11 +18,11 @@ impl App {
             Paragraph::new(body)
                 .block(input_block(
                     tr(self.lang, "input_auth_title"),
-                    Style::default().fg(Color::LightRed),
+                    Style::default().fg(Color::Magenta),
                 ))
                 .style(
                     Style::default()
-                        .fg(Color::LightRed)
+                        .fg(Color::Magenta)
                         .add_modifier(Modifier::BOLD),
                 )
                 .wrap(Wrap { trim: false })
@@ -30,7 +30,7 @@ impl App {
             let (prompt, title, style) = input_state(self);
             Paragraph::new(prompt)
                 .block(input_block(title, style))
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(Color::Green))
                 .wrap(Wrap { trim: false })
         };
 
@@ -66,7 +66,7 @@ fn input_state(app: &App) -> (String, &'static str, Style) {
         AgentTask::Running(desc) => (
             format!("  ⟳ {}...", running_label(app.lang, desc)),
             tr(app.lang, "input_title_running"),
-            Style::default().fg(Color::LightYellow),
+            Style::default().fg(Color::LightBlue),
         ),
         AgentTask::Done(summary) => (
             format!("  ✓ {}  |  {}█", summary, app.input),
@@ -76,7 +76,7 @@ fn input_state(app: &App) -> (String, &'static str, Style) {
         AgentTask::Error(err) => (
             format!("  ✗ {}  |  {}█", err, app.input),
             tr(app.lang, "input_title_error"),
-            Style::default().fg(Color::LightRed),
+            Style::default().fg(Color::Magenta),
         ),
     }
 }
@@ -93,7 +93,7 @@ fn running_label(lang: Language, desc: &str) -> String {
 fn input_block(title: &'static str, style: Style) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
         .border_style(style)
         .title(Span::styled(title, style.add_modifier(Modifier::BOLD)))
 }

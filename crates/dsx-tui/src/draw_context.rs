@@ -25,7 +25,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
+                    .border_type(BorderType::Thick)
                     .border_style(Style::default().fg(Color::LightCyan))
                     .title(Span::styled(
                         " Context Capsule ",
@@ -43,10 +43,10 @@ impl App {
 fn append_brief(brief: &TaskBriefPanel, lines: &mut Vec<Line<'static>>) {
     push_field(lines, "Goal", &brief.goal, Color::LightCyan, 3);
     push_field(lines, "Done", &brief.done, Color::LightGreen, 2);
-    push_field(lines, "Plan", &brief.plan, Color::White, 5);
-    push_field(lines, "Last", &brief.last_changes, Color::Yellow, 3);
+    push_field(lines, "Plan", &brief.plan, Color::Green, 5);
+    push_field(lines, "Last", &brief.last_changes, Color::LightBlue, 3);
     push_field(lines, "Next", &brief.next_step, Color::LightMagenta, 2);
-    push_field(lines, "Constraints", &brief.constraints, Color::LightRed, 5);
+    push_field(lines, "Constraints", &brief.constraints, Color::Magenta, 5);
     push_field(
         lines,
         "Architecture",
@@ -57,7 +57,7 @@ fn append_brief(brief: &TaskBriefPanel, lines: &mut Vec<Line<'static>>) {
 }
 
 fn append_scope(app: &App, lines: &mut Vec<Line<'static>>) {
-    push_inline(lines, "Launch", &app.scope_lock.launch_scope, Color::Gray);
+    push_inline(lines, "Launch", &app.scope_lock.launch_scope, Color::LightCyan);
     push_inline(
         lines,
         "Active",
@@ -66,17 +66,17 @@ fn append_scope(app: &App, lines: &mut Vec<Line<'static>>) {
     );
     push_inline(lines, "Status", &app.scope_lock.status, scope_color(app));
     if !app.scope_lock.warning.trim().is_empty() {
-        push_inline(lines, "Check", &app.scope_lock.warning, Color::LightYellow);
+        push_inline(lines, "Check", &app.scope_lock.warning, Color::LightBlue);
     }
 }
 
 fn append_handoff(app: &App, lines: &mut Vec<Line<'static>>) {
     let color = if app.scope_violations > 0 {
-        Color::LightRed
+        Color::Magenta
     } else if handoff_ready(app) {
         Color::LightGreen
     } else {
-        Color::Gray
+        Color::LightCyan
     };
     push_inline(lines, "Handoff", &handoff_status_text(app), color);
 }
@@ -91,7 +91,7 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
     if app.folder_notes.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  none loaded",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Cyan),
         )]));
         return;
     }
@@ -116,11 +116,11 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
                     }),
             ),
             Span::raw(" "),
-            Span::styled(note.summary.clone(), Style::default().fg(Color::White)),
+            Span::styled(note.summary.clone(), Style::default().fg(Color::Green)),
         ]));
         lines.push(Line::from(vec![
             Span::raw("    next: "),
-            Span::styled(note.next_step.clone(), Style::default().fg(Color::Gray)),
+            Span::styled(note.next_step.clone(), Style::default().fg(Color::LightCyan)),
         ]));
         lines.push(Line::from(vec![
             Span::raw("    arch: "),
@@ -153,7 +153,7 @@ fn append_folder_notes(app: &App, lines: &mut Vec<Line<'static>>) {
 
 fn append_focused_action(app: &App, lines: &mut Vec<Line<'static>>) {
     if let Some(scope) = app.focused_folder_scope() {
-        push_inline(lines, "Focused path", &scope, Color::Gray);
+        push_inline(lines, "Focused path", &scope, Color::LightCyan);
         push_inline(
             lines,
             "Focused action",
@@ -165,7 +165,7 @@ fn append_focused_action(app: &App, lines: &mut Vec<Line<'static>>) {
             lines,
             "Focused action",
             "draft disabled for unsafe folder label",
-            Color::LightRed,
+            Color::Magenta,
         );
     }
 }
@@ -224,7 +224,7 @@ fn push_field(
     for line in value.lines().take(limit) {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(line.to_string(), Style::default().fg(Color::White)),
+            Span::styled(line.to_string(), Style::default().fg(Color::Green)),
         ]));
     }
 }
@@ -240,17 +240,17 @@ fn push_inline(lines: &mut Vec<Line<'static>>, label: &'static str, value: &str,
             format!("{label}: "),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(shown.to_string(), Style::default().fg(Color::White)),
+        Span::styled(shown.to_string(), Style::default().fg(Color::Green)),
     ]));
 }
 
 fn scope_color(app: &App) -> Color {
     if app.scope_violations > 0 {
-        Color::LightRed
+        Color::Magenta
     } else if app.scope_lock.status == "Narrowed" {
         Color::LightGreen
     } else {
-        Color::LightYellow
+        Color::LightBlue
     }
 }
 
