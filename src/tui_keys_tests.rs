@@ -124,7 +124,7 @@ mod tests {
         let app = app.lock().unwrap();
         let scope = dsx_agent::scope::resolve_task_scope(&root, &app.input).unwrap();
 
-        assert_eq!(app.input, "use folder 1234 only: ");
+        assert_eq!(app.input, "используй папку 1234 только: ");
         assert_eq!(scope.active_root, scoped.canonicalize().unwrap());
         assert_eq!(app.cursor_pos, app.input.chars().count());
         assert!(!app.show_context);
