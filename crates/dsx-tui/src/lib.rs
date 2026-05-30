@@ -77,7 +77,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let initial_lang = Language::English;
+        let initial_lang = Language::Russian;
         let initial_msg = match initial_lang {
             Language::Russian => {
                 "DSX Code — ИИ-агент для кодинга на базе DeepSeek V4.\nВведите задачу и нажмите Enter. Ctrl+C для выхода."
